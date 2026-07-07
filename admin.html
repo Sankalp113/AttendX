@@ -627,17 +627,17 @@
       <div class="stat-card">
         <div class="stat-icon">👥</div>
         <div class="stat-value green" id="stat-avg-present">0</div>
-        <div class="stat-label">Total Check-ins</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">📊</div>
-        <div class="stat-value cyan" id="stat-best-attendance">0</div>
-        <div class="stat-label">Avg Attendance / Session</div>
+        <div class="stat-label">Avg Students / Session</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">🏆</div>
-        <div class="stat-value yellow" id="stat-best">—</div>
-        <div class="stat-label">Highest Session</div>
+        <div class="stat-value cyan" id="stat-best-attendance">0</div>
+        <div class="stat-label">100% Attendance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value yellow" id="stat-total-checkins">0</div>
+        <div class="stat-label">Total Check-ins</div>
       </div>
     </div>
 
@@ -954,6 +954,8 @@ function updateAnalyticsViews() {
   
   document.getElementById('stat-total-sessions').textContent = totalPossible;
   document.getElementById('stat-avg-present').textContent = avgPresent;
+  const totalCheckins = presentCounts.reduce((a,b) => a+b, 0);
+  document.getElementById('stat-total-checkins').textContent = totalCheckins;
 
   const studentMap = {};
   targetSessions.forEach(s => {
