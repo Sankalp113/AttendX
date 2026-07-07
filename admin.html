@@ -416,9 +416,8 @@
           AttendX
         </div>
       <nav class="nav-tabs" role="tablist">
-        <button class="tab-btn" onclick="switchTab('teacher')" id="tab-teacher" class="tab-btn active">🎓 Teacher 🔒</button>
-        <button class="tab-btn active" onclick="switchTab('student')" id="tab-student">👤 Student</button>
-        <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics 🔒</button>
+        <button class="tab-btn active" onclick="switchTab('teacher')" id="tab-teacher">🎓 Teacher</button>
+        <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics</button>
       </nav>
     </div>
   </div>
@@ -574,7 +573,7 @@
               <th>Status</th>
             </tr>
           </thead>
-          <tbody id="live-tbody">
+          <tbody id="live-attendance-tbody">
             <tr><td colspan="5"><div class="empty-state"><div class="empty-icon">🕐</div>Waiting for students to check in…</div></td></tr>
           </tbody>
         </table>
@@ -596,93 +595,6 @@
   </div>
 </div>
 
-
-        <div style="margin-top:14px;padding:10px 14px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:8px;display:flex;align-items:center;gap:8px;">
-          <span style="font-size:1.1rem;">✅</span>
-          <span style="font-weight:700;color:var(--accent2);font-size:0.9rem;">Status: PRESENT</span>
-        </div>
-      </div>
-      <button class="btn btn-outline" onclick="resetCheckin()">← Mark Another</button>
-    </div>
-
-    <!-- ── FORM STATE ── -->
-    <div id="checkin-form">
-      <div class="card">
-        <div class="form-group">
-          <label for="student-code">Attendance Code</label>
-          <input type="text" id="student-code" placeholder="Enter 6-digit code" maxlength="6"
-            style="text-align:center;font-size:1.5rem;font-weight:700;letter-spacing:0.3em;text-transform:uppercase;"
-            oninput="this.value=this.value.toUpperCase()" />
-        </div>
-
-        <!-- Session Info Preview (shows on valid code) -->
-        <div id="code-preview" style="display:none;margin-bottom:16px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.25);border-radius:var(--radius-sm);padding:16px;">
-          <div style="display:flex;align-items:flex-start;gap:12px;">
-            <div style="font-size:1.8rem;margin-top:2px;">📚</div>
-            <div style="flex:1;">
-              <div id="preview-subject" style="font-weight:700;font-size:0.95rem;margin-bottom:6px;"></div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-                <div style="font-size:0.78rem;">
-                  <span style="color:var(--text-muted);">Program: </span>
-                  <span id="preview-program" style="color:var(--primary-light);font-weight:600;"></span>
-                </div>
-                <div style="font-size:0.78rem;">
-                  <span style="color:var(--text-muted);">Type: </span>
-                  <span id="preview-type" style="color:var(--primary);font-weight:600;background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;"></span>
-                </div>
-                <div style="font-size:0.78rem;">
-                  <span style="color:var(--text-muted);">Date: </span>
-                  <span id="preview-date" style="color:var(--accent);font-weight:600;"></span>
-                </div>
-                <div style="font-size:0.78rem;">
-                  <span style="color:var(--text-muted);">Teacher: </span>
-                  <span id="preview-class" style="color:var(--text-soft);font-weight:500;"></span>
-                </div>
-                <div style="font-size:0.78rem;">
-                  <span style="color:var(--text-muted);">Expires in: </span>
-                  <span id="preview-timer" style="color:var(--accent2);font-weight:700;"></span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="student-name">Full Name</label>
-          <input type="text" id="student-name" placeholder="e.g. Ali Raza" />
-        </div>
-        <div class="form-group">
-          <label for="student-roll">Roll Number / Student ID</label>
-          <input type="text" id="student-roll" placeholder="e.g. 2023-CS-047" />
-        </div>
-        <div class="form-group">
-          <label for="student-session-type">Session Type</label>
-          <select id="student-session-type">
-            <option value="" disabled selected>Select type...</option>
-            <option value="Lecture">Lecture</option>
-            <option value="Laboratory">Laboratory</option>
-          </select>
-        </div>
-        <div id="alert-checkin" class="alert alert-error">An error occurred.</div>
-        <button class="btn btn-primary btn-full" onclick="markAttendance()" style="font-size:1rem;padding:16px;">
-          ✅ Mark Attendance
-        </button>
-      </div>
-
-      <!-- ── STATUS CHECKER ── -->
-      <div class="card" style="margin-top:20px;border-color:rgba(6,182,212,0.25);">
-        <div class="card-title" style="font-size:0.95rem;">🔍 Check My Attendance Status</div>
-        <div class="card-sub">Enter your Roll No. to see if you are marked present.</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <input type="text" id="check-roll" placeholder="Enter Roll Number" style="flex:1;min-width:140px;" />
-          <button class="btn btn-outline" onclick="checkStatus()" style="border-color:var(--accent);color:var(--accent);">🔍 Check</button>
-        </div>
-        <div id="status-result" style="margin-top:14px;display:none;"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- ───────────────── ANALYTICS PANEL ───────────────── -->
 <div class="panel" id="panel-analytics">
   <div class="container">
@@ -697,21 +609,29 @@
       </div>
     </div>
 
+    <!-- Session Filter -->
+    <div class="form-group" style="margin-bottom:24px;">
+      <label for="analytic-session-select">Filter by Session</label>
+      <select id="analytic-session-select" onchange="updateAnalyticsViews()">
+        <option value="ALL">All Sessions (Overall)</option>
+      </select>
+    </div>
+
     <!-- Summary Stats -->
     <div class="grid-4" style="margin-bottom:28px;">
       <div class="stat-card">
         <div class="stat-icon">📋</div>
-        <div class="stat-value primary" id="stat-sessions">0</div>
+        <div class="stat-value primary" id="stat-total-sessions">0</div>
         <div class="stat-label">Total Sessions</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">👥</div>
-        <div class="stat-value green" id="stat-entries">0</div>
+        <div class="stat-value green" id="stat-avg-present">0</div>
         <div class="stat-label">Total Check-ins</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">📊</div>
-        <div class="stat-value cyan" id="stat-avg">0%</div>
+        <div class="stat-value cyan" id="stat-best-attendance">0</div>
         <div class="stat-label">Avg Attendance / Session</div>
       </div>
       <div class="stat-card">
@@ -812,6 +732,7 @@ let activeSession = null;
 let timerInterval = null;
 let barChartInst = null;
 let pieChartInst = null;
+let selectedSessionId = null;
 
 db.ref('sessions').on('value', snap => {
   const data = snap.val();
@@ -1002,6 +923,22 @@ function renderAnalytics() {
     sel.innerHTML += `<option value="${s.id}">${esc(s.subject)} (${d})</option>`;
   });
   if (sessions.find(s => s.id === oldVal)) sel.value = oldVal;
+
+  // Populate analytics sessions list
+  const asList = document.getElementById('analytics-sessions-list');
+  if (asList) {
+    if (!sessions.length) {
+      asList.innerHTML = '<div class="empty-state"><div class="empty-icon">📂</div>No sessions yet.</div>';
+    } else {
+      asList.innerHTML = '';
+      sessions.forEach(s => {
+        const d = s.sessionDate ? new Date(s.sessionDate + 'T00:00:00').toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : new Date(s.createdAt).toLocaleDateString();
+        const count = (s.attendance || []).length;
+        asList.innerHTML += `<div class="session-item analytics-session-item" id="as-${s.id}" style="cursor:pointer;" onclick="selectSession('${s.id}')"><div class="session-dot" style="background:var(--primary);"></div><div class="session-info"><div class="session-name">${esc(s.subject)}</div><div class="session-meta">📅 ${d} · ${count} students</div></div></div>`;
+      });
+    }
+  }
+
   updateAnalyticsViews();
 }
 
@@ -1120,6 +1057,52 @@ function exportSingleExcel(id) {
   XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
   XLSX.writeFile(wb, filename);
 }
+
+function clearAll() {
+  if (!confirm('Are you sure you want to delete ALL session data? This cannot be undone.')) return;
+  db.ref('sessions').remove();
+}
+
+function copyCode() {
+  if (!activeSession) return;
+  navigator.clipboard.writeText(activeSession.code).then(() => {
+    const btn = document.getElementById('copy-btn');
+    const tooltip = btn.querySelector('.copy-tooltip');
+    if (tooltip) { tooltip.style.opacity = '1'; setTimeout(() => tooltip.style.opacity = '0', 1500); }
+  });
+}
+
+function exportSessionExcel() {
+  if (!selectedSessionId) return;
+  exportSingleExcel(selectedSessionId);
+}
+
+function selectSession(id) {
+  selectedSessionId = id;
+  const s = sessions.find(x => x.id === id);
+  if (!s) return;
+  
+  document.getElementById('detail-session-name').textContent = s.subject;
+  const tbody = document.getElementById('detail-tbody');
+  const att = s.attendance || [];
+  if (!att.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📭</div>No attendance recorded</div></td></tr>';
+  } else {
+    tbody.innerHTML = '';
+    att.forEach((a, i) => {
+      tbody.innerHTML += `<tr><td>${i+1}</td><td style="font-weight:600;">${esc(a.name)}</td><td style="font-family:monospace;color:var(--primary-light);">${esc(a.roll)}</td><td style="color:var(--text-muted);">${new Date(a.time).toLocaleTimeString()}</td><td><span class="badge badge-green">Present</span></td></tr>`;
+    });
+  }
+  document.getElementById('detail-stats').textContent = `${att.length} student(s) present`;
+  document.getElementById('btn-export-session').style.display = 'inline-flex';
+  
+  // Highlight selected session in list
+  document.querySelectorAll('.analytics-session-item').forEach(el => el.style.background = 'transparent');
+  const sel = document.getElementById('as-' + id);
+  if (sel) sel.style.background = 'rgba(99,102,241,0.12)';
+}
+
+
 
 document.addEventListener('DOMContentLoaded', () => {
   const today = new Date().toISOString().slice(0, 10);
