@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AttendX — Smart Attendance System</title>
+  <meta name="description" content="A smart student attendance system with time-limited codes, real-time tracking, and Excel analytics export." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #07080f;
+      --bg2: #0d0f1c;
+      --bg3: #12152a;
+      --surface: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.08);
+      --border-active: rgba(99,102,241,0.5);
+      --primary: #6366f1;
+      --primary-light: #818cf8;
+      --primary-glow: rgba(99,102,241,0.25);
+      --accent: #06b6d4;
+      --accent2: #10b981;
+      --danger: #f43f5e;
+      --warning: #f59e0b;
+      --text: #f1f5f9;
+      --text-muted: #64748b;
+      --text-soft: #94a3b8;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 25px 50px -12px rgba(0,0,0,0.6);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background Orbs ── */
+    .bg-orbs {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    }
+    .orb {
+      position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.12;
+      animation: float 12s ease-in-out infinite;
+    }
+    .orb-1 { width: 500px; height: 500px; background: var(--primary); top: -150px; left: -100px; animation-delay: 0s; }
+    .orb-2 { width: 400px; height: 400px; background: var(--accent); bottom: -100px; right: -80px; animation-delay: 4s; }
+    .orb-3 { width: 300px; height: 300px; background: var(--accent2); top: 50%; left: 50%; animation-delay: 8s; }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0,0) scale(1); }
+      33% { transform: translate(30px,-30px) scale(1.05); }
+      66% { transform: translate(-20px,20px) scale(0.95); }
+    }
+
+    /* ── Layout ── */
+    .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+    /* ── Header ── */
+    header {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      background: rgba(7,8,15,0.6);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .logo {
+      display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 1.4rem;
+      background: linear-gradient(135deg, var(--primary-light), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .logo-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; overflow: hidden;
+      box-shadow: 0 0 20px rgba(99,102,241,0.4);
+    }
+    .logo-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+    .nav-tabs {
+      display: flex; gap: 6px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 4px;
+    }
+    .tab-btn {
+      padding: 9px 20px; border: none; border-radius: 9px; cursor: pointer;
+      font-family: 'Inter', sans-serif; font-size: 0.875rem; font-weight: 500;
+      color: var(--text-muted); background: transparent; transition: all 0.25s ease;
+    }
+    .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: white; box-shadow: 0 4px 15px var(--primary-glow);
+    }
+
+    /* ── Panel ── */
+    .panel { display: none; padding: 48px 0 80px; animation: fadeUp 0.4s ease; }
+    .panel.active { display: block; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Section Title ── */
+    .section-title {
+      font-size: 2rem; font-weight: 800; margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--text), var(--text-soft));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .section-sub { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 36px; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      backdrop-filter: blur(20px);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .card:hover { border-color: var(--border-active); box-shadow: 0 0 40px var(--primary-glow); }
+    .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+    .card-sub { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 20px; }
+
+    /* ── Grid ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } .grid-3 { grid-template-columns: 1fr 1fr; } .grid-4 { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+    /* ── Form Elements ── */
+    label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-soft); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+    input, select, textarea {
+      width: 100%; padding: 13px 16px; background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.95rem;
+      outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+    input::placeholder { color: var(--text-muted); }
+    select option { background: #1e2139; }
+    .form-group { margin-bottom: 20px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 13px 24px;
+      border: none; border-radius: var(--radius-sm); font-family: 'Inter', sans-serif;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.25s ease;
+      text-decoration: none; white-space: nowrap;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: white; box-shadow: 0 4px 20px var(--primary-glow);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px var(--primary-glow); }
+    .btn-accent {
+      background: linear-gradient(135deg, var(--accent2), #059669);
+      color: white; box-shadow: 0 4px 20px rgba(16,185,129,0.25);
+    }
+    .btn-accent:hover { transform: translateY(-2px); }
+    .btn-danger {
+      background: linear-gradient(135deg, var(--danger), #e11d48);
+      color: white;
+    }
+    .btn-danger:hover { transform: translateY(-2px); }
+    .btn-outline {
+      background: transparent; color: var(--text-soft);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-sm { padding: 8px 16px; font-size: 0.8rem; }
+    .btn-full { width: 100%; justify-content: center; }
+
+    /* ── Code Display ── */
+    .code-box {
+      text-align: center; padding: 40px; background: var(--bg3);
+      border: 2px dashed var(--border-active); border-radius: var(--radius);
+      margin: 20px 0; position: relative; overflow: hidden;
+    }
+    .code-box::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at center, var(--primary-glow), transparent 70%);
+      pointer-events: none;
+    }
+    .code-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; }
+    .code-value {
+      font-size: 3.5rem; font-weight: 900; letter-spacing: 0.35em;
+      background: linear-gradient(135deg, var(--primary-light), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      line-height: 1;
+    }
+    .code-expire { font-size: 0.85rem; color: var(--text-muted); margin-top: 12px; }
+
+    /* ── Timer ── */
+    .timer-ring-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 20px 0;
+    }
+    .timer-ring { position: relative; width: 120px; height: 120px; }
+    .timer-ring svg { transform: rotate(-90deg); }
+    .timer-ring circle.bg { fill: none; stroke: var(--bg3); stroke-width: 8; }
+    .timer-ring circle.prog {
+      fill: none; stroke: url(#timerGrad); stroke-width: 8;
+      stroke-linecap: round; transition: stroke-dashoffset 1s linear;
+    }
+    .timer-text {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; font-weight: 700;
+    }
+    .timer-mins { font-size: 1.6rem; line-height: 1; }
+    .timer-secs { font-size: 0.7rem; color: var(--text-muted); }
+    .timer-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+      border-radius: 100px; font-size: 0.72rem; font-weight: 600;
+    }
+    .badge-green { background: rgba(16,185,129,0.15); color: var(--accent2); border: 1px solid rgba(16,185,129,0.3); }
+    .badge-red { background: rgba(244,63,94,0.15); color: var(--danger); border: 1px solid rgba(244,63,94,0.3); }
+    .badge-blue { background: rgba(99,102,241,0.15); color: var(--primary-light); border: 1px solid rgba(99,102,241,0.3); }
+    .badge-yellow { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+    /* ── Stat Cards ── */
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 22px; backdrop-filter: blur(20px);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .stat-card:hover { transform: translateY(-3px); border-color: var(--border-active); }
+    .stat-icon { font-size: 1.6rem; margin-bottom: 10px; }
+    .stat-value { font-size: 2rem; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+    .stat-label { font-size: 0.8rem; color: var(--text-muted); }
+    .stat-value.primary { background: linear-gradient(135deg, var(--primary-light), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .stat-value.green { background: linear-gradient(135deg, var(--accent2), #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .stat-value.cyan { background: linear-gradient(135deg, var(--accent), #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .stat-value.yellow { background: linear-gradient(135deg, var(--warning), #fcd34d); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    thead th {
+      padding: 14px 16px; text-align: left; font-size: 0.72rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em;
+      background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border);
+    }
+    tbody tr { transition: background 0.15s; }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+    tbody tr:not(:last-child) { border-bottom: 1px solid var(--border); }
+    td { padding: 13px 16px; color: var(--text-soft); vertical-align: middle; }
+    td strong { color: var(--text); font-weight: 600; }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state .empty-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.4; }
+
+    /* ── Progress Bar ── */
+    .progress-bar-wrap { background: rgba(255,255,255,0.06); border-radius: 100px; height: 8px; overflow: hidden; }
+    .progress-bar { height: 100%; border-radius: 100px; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+
+    /* ── Alert ── */
+    .alert {
+      padding: 14px 18px; border-radius: var(--radius-sm); font-size: 0.875rem;
+      border-left: 3px solid; margin-bottom: 16px; display: none;
+    }
+    .alert.show { display: block; animation: fadeUp 0.3s ease; }
+    .alert-success { background: rgba(16,185,129,0.1); border-color: var(--accent2); color: #34d399; }
+    .alert-error { background: rgba(244,63,94,0.1); border-color: var(--danger); color: #fb7185; }
+    .alert-info { background: rgba(99,102,241,0.1); border-color: var(--primary); color: var(--primary-light); }
+
+    /* ── Chart Container ── */
+    .chart-container { position: relative; height: 260px; }
+
+    /* ── Session List ── */
+    .session-item {
+      padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 16px;
+      margin-bottom: 10px;
+    }
+    .session-item:hover { border-color: var(--border-active); background: var(--primary-glow); }
+    .session-item.selected { border-color: var(--primary); background: rgba(99,102,241,0.1); }
+    .session-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .session-info { flex: 1; min-width: 0; }
+    .session-name { font-weight: 600; font-size: 0.9rem; }
+    .session-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Checkin Success ── */
+    .success-anim {
+      text-align: center; padding: 48px 24px; display: none;
+    }
+    .success-anim.show { display: block; animation: fadeUp 0.4s ease; }
+    .checkmark-circle {
+      width: 80px; height: 80px; background: linear-gradient(135deg, var(--accent2), #059669);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 2.5rem; margin: 0 auto 20px; box-shadow: 0 0 40px rgba(16,185,129,0.4);
+      animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    /* ── Divider ── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .code-value { font-size: 2.5rem; }
+      .header-inner { flex-direction: column; align-items: flex-start; }
+      .section-title { font-size: 1.5rem; }
+    }
+
+    /* ── Copy tooltip ── */
+    .copy-btn { position: relative; }
+    .copy-tooltip {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+      background: var(--accent2); color: white; padding: 4px 10px; border-radius: 6px;
+      font-size: 0.72rem; font-weight: 600; white-space: nowrap; opacity: 0;
+      transition: opacity 0.2s; pointer-events: none;
+    }
+    .copy-btn.copied .copy-tooltip { opacity: 1; }
+
+    /* ── Password Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 999;
+      background: rgba(7,8,15,0.85); backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+    }
+    .modal-overlay.show { opacity: 1; pointer-events: all; }
+    .modal-box {
+      background: #0d0f1c; border: 1px solid rgba(99,102,241,0.35);
+      border-radius: 20px; padding: 40px 36px; width: 100%; max-width: 420px;
+      box-shadow: 0 0 80px rgba(99,102,241,0.2); text-align: center;
+      animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+      position: relative; overflow: hidden;
+    }
+    .modal-box::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at 50% 0%, rgba(99,102,241,0.12), transparent 60%);
+      pointer-events: none;
+    }
+    .modal-lock-icon {
+      width: 68px; height: 68px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.8rem; margin: 0 auto 20px;
+      box-shadow: 0 0 30px rgba(99,102,241,0.4);
+    }
+    .modal-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 6px; }
+    .modal-sub { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px; }
+    .modal-input-wrap { position: relative; margin-bottom: 16px; }
+    .modal-input-wrap input {
+      padding-right: 48px; letter-spacing: 0.08em; font-size: 1rem;
+      text-align: center; font-weight: 600;
+    }
+    .toggle-pw {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; color: var(--text-muted);
+      font-size: 1rem; padding: 4px;
+    }
+    .modal-error {
+      font-size: 0.8rem; color: var(--danger); margin-bottom: 14px;
+      display: none; animation: fadeUp 0.2s ease;
+    }
+    .modal-error.show { display: block; }
+    .lock-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(244,63,94,0.12); color: var(--danger);
+      border: 1px solid rgba(244,63,94,0.3); border-radius: 100px;
+      font-size: 0.72rem; font-weight: 600; padding: 4px 10px; margin-bottom: 8px;
+    }
+  </style>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+</head>
+<body>
+
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<!-- ───────────────── PASSWORD MODAL ───────────────── -->
+<div class="modal-overlay" id="pw-modal">
+  <div class="modal-box">
+    <div class="lock-badge">🔒 Restricted Access</div>
+    <div class="modal-lock-icon">🔐</div>
+    <div class="modal-title">Teacher Access Only</div>
+    <div class="modal-sub" id="pw-modal-sub">Enter the password to access the Teacher Dashboard &amp; Analytics.</div>
+    <div class="modal-input-wrap">
+      <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')verifyPw()" />
+      <button class="toggle-pw" onclick="togglePwVisibility()" id="toggle-pw-btn">👁</button>
+    </div>
+    <div class="modal-error" id="pw-error">❌ Incorrect password. Please try again.</div>
+    <button class="btn btn-primary btn-full" onclick="verifyPw()" style="margin-bottom:12px;">🔓 Unlock</button>
+    <button class="btn btn-outline btn-full btn-sm" onclick="closePwModal()">← Back to Student</button>
+  </div>
+</div>
+
+<header>
+  <div class="container">
+    <div class="header-inner">
+        <div class="logo">
+          <div class="logo-icon">
+            <img src="logo.png" alt="AttendX Logo" />
+          </div>
+          AttendX
+        </div>
+      <nav class="nav-tabs" role="tablist">
+        <button class="tab-btn" onclick="switchTab('teacher')" id="tab-teacher">🎓 Teacher 🔒</button>
+        <button class="tab-btn active" onclick="switchTab('student')" id="tab-student">👤 Student</button>
+        <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics 🔒</button>
+      </nav>
+    </div>
+  </div>
+</header>
+
+
+
+        <!-- Hidden inputs to carry values -->
+        <input type="hidden" id="session-subject" />
+        <input type="hidden" id="session-class" />
+        <input type="hidden" id="session-teacher" value="Prof. Sankalp Bhatia" />
+        <div class="form-group">
+          <label for="session-duration">Code Valid Duration</label>
+          <select id="session-duration">
+            <option value="1" selected>1 minute</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="session-type">Session Type</label>
+          <select id="session-type">
+            <option value="" disabled selected>Select type...</option>
+            <option value="Lecture">Lecture</option>
+            <option value="Laboratory">Laboratory</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="session-date">📅 Class Date</label>
+          <input type="date" id="session-date" />
+        </div>
+        <div id="alert-create" class="alert alert-error">Please fill in all fields.</div>
+        <button class="btn btn-primary btn-full" onclick="createSession()" id="btn-create">
+          ✨ Generate Attendance Code
+        </button>
+      </div>
+
+      <!-- Active Session -->
+      <div class="card">
+        <div class="card-title">🔴 Active Session</div>
+        <div class="card-sub">Share this code with students to mark attendance.</div>
+
+        <div id="no-session" style="text-align:center;padding:40px 0;color:var(--text-muted);">
+          <div style="font-size:3rem;margin-bottom:12px;">⏰</div>
+          <p>No active session yet.<br>Create one to get started.</p>
+        </div>
+
+        <div id="active-session" style="display:none;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div id="active-subject" style="font-weight:700;font-size:1rem;"></div>
+              <div id="active-class" style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;"></div>
+            </div>
+            <span class="badge badge-green"><span class="dot"></span> Live</span>
+          </div>
+
+          <div class="code-box">
+            <svg style="position:absolute;width:0;height:0">
+              <defs>
+                <linearGradient id="timerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" style="stop-color:#6366f1"/>
+                  <stop offset="100%" style="stop-color:#06b6d4"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="code-label">Attendance Code</div>
+            <div class="code-value" id="code-display">------</div>
+            <div class="code-expire" id="code-expire-text"></div>
+          </div>
+
+          <div class="timer-ring-wrap">
+            <div class="timer-ring">
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle class="bg" cx="60" cy="60" r="52"/>
+                <circle class="prog" id="timer-prog" cx="60" cy="60" r="52"
+                  stroke-dasharray="326.73" stroke-dashoffset="0"/>
+              </svg>
+              <div class="timer-text">
+                <div class="timer-mins" id="timer-mins">10</div>
+                <div class="timer-secs" id="timer-secs">:00</div>
+              </div>
+            </div>
+            <div class="timer-label">Remaining Time</div>
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm copy-btn" id="copy-btn" onclick="copyCode()">
+              📋 Copy Code
+              <span class="copy-tooltip">Copied!</span>
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="endSession()">⏹ End Session</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Attendance List -->
+    <div class="card" id="live-list-card" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+          <div class="card-title">👥 Live Attendance — <span id="live-count">0</span> students</div>
+          <div class="card-sub" style="margin:0;">Updates in real-time as students check in.</div>
+        </div>
+        <span class="badge badge-green"><span class="dot"></span> Watching</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Student Name</th>
+              <th>Roll / Student ID</th>
+              <th>Check-in Time</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="live-tbody">
+            <tr><td colspan="5"><div class="empty-state"><div class="empty-icon">🕐</div>Waiting for students to check in…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Past Sessions -->
+    <div style="margin-top:32px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+          <div class="section-title" style="font-size:1.4rem;">🗂 Past Sessions</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="clearAll()" style="color:var(--danger);border-color:var(--danger);">🗑 Clear All</button>
+      </div>
+      <div id="past-sessions-list">
+        <div class="empty-state"><div class="empty-icon">📂</div>No past sessions yet.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────── STUDENT PANEL ───────────────── -->
+<div class="panel active" id="panel-student">
+  <div class="container" style="max-width:580px;">
+    <h1 class="section-title">Mark Your Attendance</h1>
+    <p class="section-sub">Enter the code shared by your teacher and fill in your details.</p>
+
+    <!-- ── SUCCESS STATE ── -->
+    <div class="success-anim" id="checkin-success">
+      <div class="checkmark-circle">✓</div>
+      <h2 style="font-size:1.6rem;font-weight:800;margin-bottom:6px;">Attendance Marked!</h2>
+      <p style="color:var(--text-muted);margin-bottom:24px;font-size:0.9rem;">Your presence has been recorded successfully.</p>
+
+      <!-- Rich Info Card -->
+      <div style="background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.25);border-radius:var(--radius);padding:22px;margin-bottom:24px;text-align:left;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <span style="font-size:1.4rem;">📚</span>
+          <span style="font-weight:700;font-size:1rem;" id="sc-subject"></span>
+          <span class="badge badge-green" id="sc-type" style="margin-left:auto;"></span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:12px;">
+            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">Program</div>
+            <div style="font-size:0.85rem;font-weight:600;color:var(--primary-light);" id="sc-program"></div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:12px;">
+            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">Class Date</div>
+            <div style="font-size:0.85rem;font-weight:600;color:var(--accent);" id="sc-date"></div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:12px;">
+            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">Student</div>
+            <div style="font-size:0.85rem;font-weight:600;" id="sc-name"></div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:12px;">
+            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">Check-in Time</div>
+            <div style="font-size:0.85rem;font-weight:600;color:var(--accent2);" id="sc-time"></div>
+          </div>
+        </div>
+        <div style="margin-top:14px;padding:10px 14px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:8px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:1.1rem;">✅</span>
+          <span style="font-weight:700;color:var(--accent2);font-size:0.9rem;">Status: PRESENT</span>
+        </div>
+      </div>
+      <button class="btn btn-outline" onclick="resetCheckin()">← Mark Another</button>
+    </div>
+
+    <!-- ── FORM STATE ── -->
+    <div id="checkin-form">
+      <div class="card">
+        <div class="form-group">
+          <label for="student-code">Attendance Code</label>
+          <input type="text" id="student-code" placeholder="Enter 6-digit code" maxlength="6"
+            style="text-align:center;font-size:1.5rem;font-weight:700;letter-spacing:0.3em;text-transform:uppercase;"
+            oninput="this.value=this.value.toUpperCase()" />
+        </div>
+
+        <!-- Session Info Preview (shows on valid code) -->
+        <div id="code-preview" style="display:none;margin-bottom:16px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.25);border-radius:var(--radius-sm);padding:16px;">
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <div style="font-size:1.8rem;margin-top:2px;">📚</div>
+            <div style="flex:1;">
+              <div id="preview-subject" style="font-weight:700;font-size:0.95rem;margin-bottom:6px;"></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+                <div style="font-size:0.78rem;">
+                  <span style="color:var(--text-muted);">Program: </span>
+                  <span id="preview-program" style="color:var(--primary-light);font-weight:600;"></span>
+                </div>
+                <div style="font-size:0.78rem;">
+                  <span style="color:var(--text-muted);">Type: </span>
+                  <span id="preview-type" style="color:var(--primary);font-weight:600;background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;"></span>
+                </div>
+                <div style="font-size:0.78rem;">
+                  <span style="color:var(--text-muted);">Date: </span>
+                  <span id="preview-date" style="color:var(--accent);font-weight:600;"></span>
+                </div>
+                <div style="font-size:0.78rem;">
+                  <span style="color:var(--text-muted);">Teacher: </span>
+                  <span id="preview-class" style="color:var(--text-soft);font-weight:500;"></span>
+                </div>
+                <div style="font-size:0.78rem;">
+                  <span style="color:var(--text-muted);">Expires in: </span>
+                  <span id="preview-timer" style="color:var(--accent2);font-weight:700;"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="student-name">Full Name</label>
+          <input type="text" id="student-name" placeholder="e.g. Ali Raza" />
+        </div>
+        <div class="form-group">
+          <label for="student-roll">Roll Number / Student ID</label>
+          <input type="text" id="student-roll" placeholder="e.g. 2023-CS-047" />
+        </div>
+        <div class="form-group">
+          <label for="student-session-type">Session Type</label>
+          <select id="student-session-type">
+            <option value="" disabled selected>Select type...</option>
+            <option value="Lecture">Lecture</option>
+            <option value="Laboratory">Laboratory</option>
+          </select>
+        </div>
+        <div id="alert-checkin" class="alert alert-error">An error occurred.</div>
+        <button class="btn btn-primary btn-full" onclick="markAttendance()" style="font-size:1rem;padding:16px;">
+          ✅ Mark Attendance
+        </button>
+      </div>
+
+      <!-- ── STATUS CHECKER ── -->
+      <div class="card" style="margin-top:20px;border-color:rgba(6,182,212,0.25);">
+        <div class="card-title" style="font-size:0.95rem;">🔍 Check My Attendance Status</div>
+        <div class="card-sub">Enter your Roll No. to see if you are marked present.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <input type="text" id="check-roll" placeholder="Enter Roll Number" style="flex:1;min-width:140px;" />
+          <button class="btn btn-outline" onclick="checkStatus()" style="border-color:var(--accent);color:var(--accent);">🔍 Check</button>
+        </div>
+        <div id="status-result" style="margin-top:14px;display:none;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+    <div class="grid-2" style="margin-bottom:28px;">
+      <!-- Per-Session Bar Chart -->
+      <div class="card">
+        <div class="card-title">📊 Attendance per Session</div>
+        <div class="card-sub" style="margin-bottom:16px;">Number of students per session</div>
+        <div class="chart-container">
+          <canvas id="barChart"></canvas>
+        </div>
+      </div>
+      <!-- Pie Donut -->
+      <div class="card">
+        <div class="card-title">🍩 Subject Breakdown</div>
+        <div class="card-sub" style="margin-bottom:16px;">Attendance distribution by subject</div>
+        <div class="chart-container">
+          <canvas id="pieChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Session Selector + Detailed Table -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">🗂 Sessions</div>
+        <div class="card-sub">Click a session to view its attendance.</div>
+        <div id="analytics-sessions-list">
+          <div class="empty-state"><div class="empty-icon">📂</div>No sessions yet.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Attendance Detail — <span id="detail-session-name">select a session</span></div>
+        <div class="card-sub">Full student list for the selected session.</div>
+        <div id="detail-table-wrap" class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Name</th><th>Roll / ID</th><th>Time</th><th>Status</th></tr>
+            </thead>
+            <tbody id="detail-tbody">
+              <tr><td colspan="5"><div class="empty-state"><div class="empty-icon">👆</div>Select a session</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <span id="detail-stats" style="font-size:0.8rem;color:var(--text-muted);"></span>
+          <button class="btn btn-accent btn-sm" onclick="exportSessionExcel()" id="btn-export-session" style="display:none;">
+            📥 Export This Session
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student Presence Table -->
+    <div class="card" style="margin-top:28px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+          <div class="card-title">👤 Student-wise Attendance Summary</div>
+          <div class="card-sub" style="margin:0;">Track each student's presence across all sessions.</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Roll / ID</th><th>Sessions Present</th><th>Total Sessions</th><th>Attendance %</th><th>Status</th></tr>
+          </thead>
+          <tbody id="student-summary-tbody">
+            <tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📊</div>No data yet.</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAgcBa9xlLvw9CmUMg9CICQsaVL6LJz-_o",
+  authDomain: "attendx-65999.firebaseapp.com",
+  projectId: "attendx-65999",
+  storageBucket: "attendx-65999.firebasestorage.app",
+  messagingSenderId: "988951916452",
+  appId: "1:988951916452:web:da17fcbe8142d43699db31",
+  databaseURL: "https://attendx-65999-default-rtdb.firebaseio.com"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let sessions = [];
+let activeSession = null;
+
+db.ref('sessions').on('value', snap => {
+  const data = snap.val();
+  sessions = [];
+  activeSession = null;
+  if (data) {
+    Object.keys(data).forEach(k => {
+      const s = data[k];
+      s.attendance = s.attendance ? Object.values(s.attendance) : [];
+      sessions.push(s);
+      if (!s.ended) activeSession = s;
+    });
+  }
+});
+
+function showAlert(el, type, msg) { el.className = 'alert alert-' + type; el.innerHTML = msg; el.style.display = 'block'; }
+function hideAlert(el) { el.style.display = 'none'; }
+const esc = s => { const div = document.createElement('div'); div.appendChild(document.createTextNode(s)); return div.innerHTML; };
+
+document.getElementById('student-code').addEventListener('input', function() {
+  const code = this.value.trim().toUpperCase();
+  if (code.length === 6) {
+    const session = sessions.find(s => s.code === code && !s.ended);
+    const preview = document.getElementById('code-preview');
+    if (session && new Date() < new Date(session.expiresAt)) {
+      document.getElementById('preview-subject').textContent = session.subject;
+      document.getElementById('preview-program').textContent = session.class;
+      document.getElementById('preview-type').textContent = session.sessionType || 'Session';
+      const classDate = session.sessionDate ? new Date(session.sessionDate + 'T00:00:00').toLocaleDateString('en-IN', {weekday:'short', day:'numeric', month:'short', year:'numeric'}) : new Date(session.createdAt).toLocaleDateString();
+      document.getElementById('preview-date').textContent = classDate;
+      document.getElementById('preview-class').textContent = session.teacher;
+      const rem = Math.max(0, Math.floor((new Date(session.expiresAt) - new Date()) / 1000));
+      const m = Math.floor(rem / 60), s = rem % 60;
+      document.getElementById('preview-timer').textContent = `${m}m ${s}s`;
+      preview.style.display = 'block';
+    } else preview.style.display = 'none';
+  } else document.getElementById('code-preview').style.display = 'none';
+});
+
+function markAttendance() {
+  const code = document.getElementById('student-code').value.trim().toUpperCase();
+  const name = document.getElementById('student-name').value.trim();
+  const roll = document.getElementById('student-roll').value.trim();
+  const studentSessionType = document.getElementById('student-session-type').value;
+  const alert = document.getElementById('alert-checkin');
+
+  if (!code || !name || !roll || !studentSessionType) { showAlert(alert, 'error', 'Please fill in all fields including Session Type.'); return; }
+  if (code.length !== 6) { showAlert(alert, 'error', 'Code must be exactly 6 characters.'); return; }
+  const session = sessions.find(s => s.code === code && !s.ended);
+  if (!session) { showAlert(alert, 'error', 'Invalid or expired code. Please check with your teacher.'); return; }
+  if (session.sessionType && studentSessionType !== session.sessionType) { showAlert(alert, 'error', `Incorrect Session Type. The teacher has marked this as a ${session.sessionType}.`); return; }
+  if (new Date() > new Date(session.expiresAt)) { showAlert(alert, 'error', 'This attendance code has expired.'); return; }
+  if (session.attendance.find(a => a.roll.toLowerCase() === roll.toLowerCase())) { showAlert(alert, 'error', 'You have already marked your attendance for this session.'); return; }
+
+  hideAlert(alert);
+  const checkinTime = new Date().toISOString();
+  db.ref('sessions/' + session.id + '/attendance').push({ name, roll, time: checkinTime });
+
+  document.getElementById('sc-subject').textContent = session.subject;
+  document.getElementById('sc-type').textContent = session.sessionType || 'Session';
+  document.getElementById('sc-program').textContent = session.class;
+  const classDate = session.sessionDate ? new Date(session.sessionDate + 'T00:00:00').toLocaleDateString('en-IN', {weekday:'short', day:'numeric', month:'short', year:'numeric'}) : new Date(session.createdAt).toLocaleDateString();
+  document.getElementById('sc-date').textContent = classDate;
+  document.getElementById('sc-name').textContent = name + ' (' + roll + ')';
+  document.getElementById('sc-time').textContent = new Date(checkinTime).toLocaleTimeString();
+  document.getElementById('checkin-form').style.display = 'none';
+  document.getElementById('checkin-success').classList.add('show');
+}
+
+function resetCheckin() {
+  document.getElementById('student-code').value = '';
+  document.getElementById('student-name').value = '';
+  document.getElementById('student-roll').value = '';
+  document.getElementById('student-session-type').value = '';
+  document.getElementById('checkin-form').style.display = 'block';
+  document.getElementById('checkin-success').classList.remove('show');
+  document.getElementById('code-preview').style.display = 'none';
+  hideAlert(document.getElementById('alert-checkin'));
+}
+
+function checkStatus() {
+  const roll = document.getElementById('check-roll').value.trim();
+  const result = document.getElementById('status-result');
+  if (!roll) { result.style.display = 'none'; return; }
+  const found = [];
+  sessions.forEach(s => {
+    const entry = s.attendance.find(a => a.roll.toLowerCase() === roll.toLowerCase());
+    if (entry) {
+      const classDate = s.sessionDate ? new Date(s.sessionDate + 'T00:00:00').toLocaleDateString('en-IN', {weekday:'short', day:'numeric', month:'short', year:'numeric'}) : new Date(s.createdAt).toLocaleDateString();
+      found.push({ subject: s.subject, date: classDate, time: new Date(entry.time).toLocaleTimeString(), name: entry.name });
+    }
+  });
+
+  if (!found.length) {
+    result.style.display = 'block';
+    result.innerHTML = `<div style="padding:14px;background:rgba(244,63,94,0.1);border:1px solid rgba(244,63,94,0.3);border-radius:10px;display:flex;align-items:center;gap:10px;"><span style="font-size:1.3rem;">❌</span><div><div style="font-weight:600;color:var(--text-light);font-size:0.9rem;">Not Found</div><div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">No attendance records found for roll: <strong>${esc(roll)}</strong></div></div></div>`;
+  } else {
+    result.style.display = 'block';
+    let h = `<div style="padding:14px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:10px;margin-bottom:12px;display:flex;align-items:center;gap:10px;"><span style="font-size:1.3rem;">✅</span><div><div style="font-weight:600;color:var(--text-light);font-size:0.9rem;">Present (${found.length} Sessions)</div><div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">Student: <strong>${esc(found[0].name)}</strong></div></div></div><div style="max-height:200px;overflow-y:auto;border-radius:8px;border:1px solid rgba(255,255,255,0.08);">`;
+    found.forEach(f => {
+      h += `<div style="padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.02);"><div style="font-size:0.85rem;font-weight:600;color:var(--primary-light);margin-bottom:4px;">${esc(f.subject)}</div><div style="font-size:0.75rem;color:var(--text-muted);display:flex;justify-content:space-between;"><span>📅 ${f.date}</span><span style="color:var(--accent2);">${f.time}</span></div></div>`;
+    });
+    h += '</div>';
+    result.innerHTML = h;
+  }
+}
+</script>
+</body>
+</html>

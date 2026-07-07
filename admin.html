@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AttendX — Smart Attendance System</title>
+  <meta name="description" content="A smart student attendance system with time-limited codes, real-time tracking, and Excel analytics export." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #07080f;
+      --bg2: #0d0f1c;
+      --bg3: #12152a;
+      --surface: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.08);
+      --border-active: rgba(99,102,241,0.5);
+      --primary: #6366f1;
+      --primary-light: #818cf8;
+      --primary-glow: rgba(99,102,241,0.25);
+      --accent: #06b6d4;
+      --accent2: #10b981;
+      --danger: #f43f5e;
+      --warning: #f59e0b;
+      --text: #f1f5f9;
+      --text-muted: #64748b;
+      --text-soft: #94a3b8;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 25px 50px -12px rgba(0,0,0,0.6);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background Orbs ── */
+    .bg-orbs {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    }
+    .orb {
+      position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.12;
+      animation: float 12s ease-in-out infinite;
+    }
+    .orb-1 { width: 500px; height: 500px; background: var(--primary); top: -150px; left: -100px; animation-delay: 0s; }
+    .orb-2 { width: 400px; height: 400px; background: var(--accent); bottom: -100px; right: -80px; animation-delay: 4s; }
+    .orb-3 { width: 300px; height: 300px; background: var(--accent2); top: 50%; left: 50%; animation-delay: 8s; }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0,0) scale(1); }
+      33% { transform: translate(30px,-30px) scale(1.05); }
+      66% { transform: translate(-20px,20px) scale(0.95); }
+    }
+
+    /* ── Layout ── */
+    .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+    /* ── Header ── */
+    header {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      background: rgba(7,8,15,0.6);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .logo {
+      display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 1.4rem;
+      background: linear-gradient(135deg, var(--primary-light), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .logo-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; overflow: hidden;
+      box-shadow: 0 0 20px rgba(99,102,241,0.4);
+    }
+    .logo-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+    .nav-tabs {
+      display: flex; gap: 6px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 4px;
+    }
+    .tab-btn {
+      padding: 9px 20px; border: none; border-radius: 9px; cursor: pointer;
+      font-family: 'Inter', sans-serif; font-size: 0.875rem; font-weight: 500;
+      color: var(--text-muted); background: transparent; transition: all 0.25s ease;
+    }
+    .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: white; box-shadow: 0 4px 15px var(--primary-glow);
+    }
+
+    /* ── Panel ── */
+    .panel { display: none; padding: 48px 0 80px; animation: fadeUp 0.4s ease; }
+    .panel.active { display: block; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Section Title ── */
+    .section-title {
+      font-size: 2rem; font-weight: 800; margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--text), var(--text-soft));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .section-sub { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 36px; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      backdrop-filter: blur(20px);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .card:hover { border-color: var(--border-active); box-shadow: 0 0 40px var(--primary-glow); }
+    .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+    .card-sub { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 20px; }
+
+    /* ── Grid ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } .grid-3 { grid-template-columns: 1fr 1fr; } .grid-4 { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+    /* ── Form Elements ── */
+    label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-soft); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+    input, select, textarea {
+      width: 100%; padding: 13px 16px; background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.95rem;
+      outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+    input::placeholder { color: var(--text-muted); }
+    select option { background: #1e2139; }
+    .form-group { margin-bottom: 20px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 13px 24px;
+      border: none; border-radius: var(--radius-sm); font-family: 'Inter', sans-serif;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.25s ease;
+      text-decoration: none; white-space: nowrap;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: white; box-shadow: 0 4px 20px var(--primary-glow);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px var(--primary-glow); }
+    .btn-accent {
+      background: linear-gradient(135deg, var(--accent2), #059669);
+      color: white; box-shadow: 0 4px 20px rgba(16,185,129,0.25);
+    }
+    .btn-accent:hover { transform: translateY(-2px); }
+    .btn-danger {
+      background: linear-gradient(135deg, var(--danger), #e11d48);
+      color: white;
+    }
+    .btn-danger:hover { transform: translateY(-2px); }
+    .btn-outline {
+      background: transparent; color: var(--text-soft);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-sm { padding: 8px 16px; font-size: 0.8rem; }
+    .btn-full { width: 100%; justify-content: center; }
+
+    /* ── Code Display ── */
+    .code-box {
+      text-align: center; padding: 40px; background: var(--bg3);
+      border: 2px dashed var(--border-active); border-radius: var(--radius);
+      margin: 20px 0; position: relative; overflow: hidden;
+    }
+    .code-box::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at center, var(--primary-glow), transparent 70%);
+      pointer-events: none;
+    }
+    .code-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; }
+    .code-value {
+      font-size: 3.5rem; font-weight: 900; letter-spacing: 0.35em;
+      background: linear-gradient(135deg, var(--primary-light), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      line-height: 1;
+    }
+    .code-expire { font-size: 0.85rem; color: var(--text-muted); margin-top: 12px; }
+
+    /* ── Timer ── */
+    .timer-ring-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 20px 0;
+    }
+    .timer-ring { position: relative; width: 120px; height: 120px; }
+    .timer-ring svg { transform: rotate(-90deg); }
+    .timer-ring circle.bg { fill: none; stroke: var(--bg3); stroke-width: 8; }
+    .timer-ring circle.prog {
+      fill: none; stroke: url(#timerGrad); stroke-width: 8;
+      stroke-linecap: round; transition: stroke-dashoffset 1s linear;
+    }
+    .timer-text {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; font-weight: 700;
+    }
+    .timer-mins { font-size: 1.6rem; line-height: 1; }
+    .timer-secs { font-size: 0.7rem; color: var(--text-muted); }
+    .timer-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+      border-radius: 100px; font-size: 0.72rem; font-weight: 600;
+    }
+    .badge-green { background: rgba(16,185,129,0.15); color: var(--accent2); border: 1px solid rgba(16,185,129,0.3); }
+    .badge-red { background: rgba(244,63,94,0.15); color: var(--danger); border: 1px solid rgba(244,63,94,0.3); }
+    .badge-blue { background: rgba(99,102,241,0.15); color: var(--primary-light); border: 1px solid rgba(99,102,241,0.3); }
+    .badge-yellow { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+    /* ── Stat Cards ── */
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 22px; backdrop-filter: blur(20px);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .stat-card:hover { transform: translateY(-3px); border-color: var(--border-active); }
+    .stat-icon { font-size: 1.6rem; margin-bottom: 10px; }
+    .stat-value { font-size: 2rem; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+    .stat-label { font-size: 0.8rem; color: var(--text-muted); }
+    .stat-value.primary { background: linear-gradient(135deg, var(--primary-light), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .stat-value.green { background: linear-gradient(135deg, var(--accent2), #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .stat-value.cyan { background: linear-gradient(135deg, var(--accent), #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .stat-value.yellow { background: linear-gradient(135deg, var(--warning), #fcd34d); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    thead th {
+      padding: 14px 16px; text-align: left; font-size: 0.72rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em;
+      background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border);
+    }
+    tbody tr { transition: background 0.15s; }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+    tbody tr:not(:last-child) { border-bottom: 1px solid var(--border); }
+    td { padding: 13px 16px; color: var(--text-soft); vertical-align: middle; }
+    td strong { color: var(--text); font-weight: 600; }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state .empty-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.4; }
+
+    /* ── Progress Bar ── */
+    .progress-bar-wrap { background: rgba(255,255,255,0.06); border-radius: 100px; height: 8px; overflow: hidden; }
+    .progress-bar { height: 100%; border-radius: 100px; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+
+    /* ── Alert ── */
+    .alert {
+      padding: 14px 18px; border-radius: var(--radius-sm); font-size: 0.875rem;
+      border-left: 3px solid; margin-bottom: 16px; display: none;
+    }
+    .alert.show { display: block; animation: fadeUp 0.3s ease; }
+    .alert-success { background: rgba(16,185,129,0.1); border-color: var(--accent2); color: #34d399; }
+    .alert-error { background: rgba(244,63,94,0.1); border-color: var(--danger); color: #fb7185; }
+    .alert-info { background: rgba(99,102,241,0.1); border-color: var(--primary); color: var(--primary-light); }
+
+    /* ── Chart Container ── */
+    .chart-container { position: relative; height: 260px; }
+
+    /* ── Session List ── */
+    .session-item {
+      padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 16px;
+      margin-bottom: 10px;
+    }
+    .session-item:hover { border-color: var(--border-active); background: var(--primary-glow); }
+    .session-item.selected { border-color: var(--primary); background: rgba(99,102,241,0.1); }
+    .session-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .session-info { flex: 1; min-width: 0; }
+    .session-name { font-weight: 600; font-size: 0.9rem; }
+    .session-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Checkin Success ── */
+    .success-anim {
+      text-align: center; padding: 48px 24px; display: none;
+    }
+    .success-anim.show { display: block; animation: fadeUp 0.4s ease; }
+    .checkmark-circle {
+      width: 80px; height: 80px; background: linear-gradient(135deg, var(--accent2), #059669);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 2.5rem; margin: 0 auto 20px; box-shadow: 0 0 40px rgba(16,185,129,0.4);
+      animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    /* ── Divider ── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .code-value { font-size: 2.5rem; }
+      .header-inner { flex-direction: column; align-items: flex-start; }
+      .section-title { font-size: 1.5rem; }
+    }
+
+    /* ── Copy tooltip ── */
+    .copy-btn { position: relative; }
+    .copy-tooltip {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+      background: var(--accent2); color: white; padding: 4px 10px; border-radius: 6px;
+      font-size: 0.72rem; font-weight: 600; white-space: nowrap; opacity: 0;
+      transition: opacity 0.2s; pointer-events: none;
+    }
+    .copy-btn.copied .copy-tooltip { opacity: 1; }
+
+    /* ── Password Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 999;
+      background: rgba(7,8,15,0.85); backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+    }
+    .modal-overlay.show { opacity: 1; pointer-events: all; }
+    .modal-box {
+      background: #0d0f1c; border: 1px solid rgba(99,102,241,0.35);
+      border-radius: 20px; padding: 40px 36px; width: 100%; max-width: 420px;
+      box-shadow: 0 0 80px rgba(99,102,241,0.2); text-align: center;
+      animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+      position: relative; overflow: hidden;
+    }
+    .modal-box::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at 50% 0%, rgba(99,102,241,0.12), transparent 60%);
+      pointer-events: none;
+    }
+    .modal-lock-icon {
+      width: 68px; height: 68px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.8rem; margin: 0 auto 20px;
+      box-shadow: 0 0 30px rgba(99,102,241,0.4);
+    }
+    .modal-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 6px; }
+    .modal-sub { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px; }
+    .modal-input-wrap { position: relative; margin-bottom: 16px; }
+    .modal-input-wrap input {
+      padding-right: 48px; letter-spacing: 0.08em; font-size: 1rem;
+      text-align: center; font-weight: 600;
+    }
+    .toggle-pw {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; color: var(--text-muted);
+      font-size: 1rem; padding: 4px;
+    }
+    .modal-error {
+      font-size: 0.8rem; color: var(--danger); margin-bottom: 14px;
+      display: none; animation: fadeUp 0.2s ease;
+    }
+    .modal-error.show { display: block; }
+    .lock-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(244,63,94,0.12); color: var(--danger);
+      border: 1px solid rgba(244,63,94,0.3); border-radius: 100px;
+      font-size: 0.72rem; font-weight: 600; padding: 4px 10px; margin-bottom: 8px;
+    }
+  </style>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+</head>
+<body>
+
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<!-- ───────────────── PASSWORD MODAL ───────────────── -->
+<div class="modal-overlay" id="pw-modal">
+  <div class="modal-box">
+    <div class="lock-badge">🔒 Restricted Access</div>
+    <div class="modal-lock-icon">🔐</div>
+    <div class="modal-title">Teacher Access Only</div>
+    <div class="modal-sub" id="pw-modal-sub">Enter the password to access the Teacher Dashboard &amp; Analytics.</div>
+    <div class="modal-input-wrap">
+      <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')verifyPw()" />
+      <button class="toggle-pw" onclick="togglePwVisibility()" id="toggle-pw-btn">👁</button>
+    </div>
+    <div class="modal-error" id="pw-error">❌ Incorrect password. Please try again.</div>
+    <button class="btn btn-primary btn-full" onclick="verifyPw()" style="margin-bottom:12px;">🔓 Unlock</button>
+    <button class="btn btn-outline btn-full btn-sm" onclick="closePwModal()">← Back to Student</button>
+  </div>
+</div>
+
+<header>
+  <div class="container">
+    <div class="header-inner">
+        <div class="logo">
+          <div class="logo-icon">
+            <img src="logo.png" alt="AttendX Logo" />
+          </div>
+          AttendX
+        </div>
+      <nav class="nav-tabs" role="tablist">
+        <button class="tab-btn" onclick="switchTab('teacher')" id="tab-teacher" class="tab-btn active">🎓 Teacher 🔒</button>
+        <button class="tab-btn active" onclick="switchTab('student')" id="tab-student">👤 Student</button>
+        <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics 🔒</button>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<!-- ───────────────── TEACHER PANEL ───────────────── -->
+<div class="panel active" id="panel-teacher">
+  <div class="container">
+    <h1 class="section-title">Teacher Dashboard</h1>
+    <p class="section-sub">Create attendance sessions, generate time-limited codes, and track student responses.</p>
+
+    <div class="grid-2" style="margin-bottom:32px;">
+      <!-- Create Session -->
+      <div class="card">
+        <div class="card-title">➕ Create Attendance Session</div>
+        <div class="card-sub">Set subject, class, and duration to generate your unique attendance code.</div>
+
+        <div class="form-group">
+          <label for="session-course">Select Course</label>
+          <select id="session-course" onchange="onCourseChange()">
+            <option value="">— Choose a course —</option>
+            <option value="1">B.Tech. Dairy Technology — Dairy Process Instrumentation and Control</option>
+            <option value="2">Diploma in HME — Industrial Machining Processes</option>
+          </select>
+        </div>
+
+        <!-- Auto-filled course details (read-only) -->
+        <div id="course-details" style="display:none;margin-bottom:20px;">
+          <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);border-radius:var(--radius-sm);padding:16px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+              <span style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;">Course Name</span>
+              <span id="cd-name" style="font-weight:700;font-size:0.9rem;color:var(--text);"></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+              <span style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;">Program</span>
+              <span id="cd-program" style="font-size:0.85rem;color:var(--primary-light);font-weight:600;"></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+              <span style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;">Course Code</span>
+              <span id="cd-code" style="font-family:monospace;background:rgba(99,102,241,0.15);color:var(--primary-light);padding:3px 10px;border-radius:6px;font-size:0.85rem;font-weight:700;"></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+              <span style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;">Teacher</span>
+              <span style="font-size:0.85rem;color:var(--accent2);font-weight:600;">👨‍🏫 Prof. Sankalp Bhatia</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hidden inputs to carry values -->
+        <input type="hidden" id="session-subject" />
+        <input type="hidden" id="session-class" />
+        <input type="hidden" id="session-teacher" value="Prof. Sankalp Bhatia" />
+        <div class="form-group">
+          <label for="session-duration">Code Valid Duration</label>
+          <select id="session-duration">
+            <option value="1" selected>1 minute</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="session-type">Session Type</label>
+          <select id="session-type">
+            <option value="" disabled selected>Select type...</option>
+            <option value="Lecture">Lecture</option>
+            <option value="Laboratory">Laboratory</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="session-date">📅 Class Date</label>
+          <input type="date" id="session-date" />
+        </div>
+        <div id="alert-create" class="alert alert-error">Please fill in all fields.</div>
+        <button class="btn btn-primary btn-full" onclick="createSession()" id="btn-create">
+          ✨ Generate Attendance Code
+        </button>
+      </div>
+
+      <!-- Active Session -->
+      <div class="card">
+        <div class="card-title">🔴 Active Session</div>
+        <div class="card-sub">Share this code with students to mark attendance.</div>
+
+        <div id="no-session" style="text-align:center;padding:40px 0;color:var(--text-muted);">
+          <div style="font-size:3rem;margin-bottom:12px;">⏰</div>
+          <p>No active session yet.<br>Create one to get started.</p>
+        </div>
+
+        <div id="active-session" style="display:none;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div id="active-subject" style="font-weight:700;font-size:1rem;"></div>
+              <div id="active-class" style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;"></div>
+            </div>
+            <span class="badge badge-green"><span class="dot"></span> Live</span>
+          </div>
+
+          <div class="code-box">
+            <svg style="position:absolute;width:0;height:0">
+              <defs>
+                <linearGradient id="timerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" style="stop-color:#6366f1"/>
+                  <stop offset="100%" style="stop-color:#06b6d4"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="code-label">Attendance Code</div>
+            <div class="code-value" id="code-display">------</div>
+            <div class="code-expire" id="code-expire-text"></div>
+          </div>
+
+          <div class="timer-ring-wrap">
+            <div class="timer-ring">
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle class="bg" cx="60" cy="60" r="52"/>
+                <circle class="prog" id="timer-prog" cx="60" cy="60" r="52"
+                  stroke-dasharray="326.73" stroke-dashoffset="0"/>
+              </svg>
+              <div class="timer-text">
+                <div class="timer-mins" id="timer-mins">10</div>
+                <div class="timer-secs" id="timer-secs">:00</div>
+              </div>
+            </div>
+            <div class="timer-label">Remaining Time</div>
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm copy-btn" id="copy-btn" onclick="copyCode()">
+              📋 Copy Code
+              <span class="copy-tooltip">Copied!</span>
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="endSession()">⏹ End Session</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Attendance List -->
+    <div class="card" id="live-list-card" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+          <div class="card-title">👥 Live Attendance — <span id="live-count">0</span> students</div>
+          <div class="card-sub" style="margin:0;">Updates in real-time as students check in.</div>
+        </div>
+        <span class="badge badge-green"><span class="dot"></span> Watching</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Student Name</th>
+              <th>Roll / Student ID</th>
+              <th>Check-in Time</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="live-tbody">
+            <tr><td colspan="5"><div class="empty-state"><div class="empty-icon">🕐</div>Waiting for students to check in…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Past Sessions -->
+    <div style="margin-top:32px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+          <div class="section-title" style="font-size:1.4rem;">🗂 Past Sessions</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="clearAll()" style="color:var(--danger);border-color:var(--danger);">🗑 Clear All</button>
+      </div>
+      <div id="past-sessions-list">
+        <div class="empty-state"><div class="empty-icon">📂</div>No past sessions yet.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+        <div style="margin-top:14px;padding:10px 14px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:8px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:1.1rem;">✅</span>
+          <span style="font-weight:700;color:var(--accent2);font-size:0.9rem;">Status: PRESENT</span>
+        </div>
+      </div>
+      <button class="btn btn-outline" onclick="resetCheckin()">← Mark Another</button>
+    </div>
+
+    <!-- ── FORM STATE ── -->
+    <div id="checkin-form">
+      <div class="card">
+        <div class="form-group">
+          <label for="student-code">Attendance Code</label>
+          <input type="text" id="student-code" placeholder="Enter 6-digit code" maxlength="6"
+            style="text-align:center;font-size:1.5rem;font-weight:700;letter-spacing:0.3em;text-transform:uppercase;"
+            oninput="this.value=this.value.toUpperCase()" />
+        </div>
+
+        <!-- Session Info Preview (shows on valid code) -->
+        <div id="code-preview" style="display:none;margin-bottom:16px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.25);border-radius:var(--radius-sm);padding:16px;">
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <div style="font-size:1.8rem;margin-top:2px;">📚</div>
+            <div style="flex:1;">
+              <div id="preview-subject" style="font-weight:700;font-size:0.95rem;margin-bottom:6px;"></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+                <div style="font-size:0.78rem;">
+                  <span style="color:var(--text-muted);">Program: </span>
+                  <span id="preview-program" style="color:var(--primary-light);font-weight:600;"></span>
+                </div>
+                <div style="font-size:0.78rem;">
+                  <span style="color:var(--text-muted);">Type: </span>
+                  <span id="preview-type" style="color:var(--primary);font-weight:600;background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;"></span>
+                </div>
+                <div style="font-size:0.78rem;">
+                  <span style="color:var(--text-muted);">Date: </span>
+                  <span id="preview-date" style="color:var(--accent);font-weight:600;"></span>
+                </div>
+                <div style="font-size:0.78rem;">
+                  <span style="color:var(--text-muted);">Teacher: </span>
+                  <span id="preview-class" style="color:var(--text-soft);font-weight:500;"></span>
+                </div>
+                <div style="font-size:0.78rem;">
+                  <span style="color:var(--text-muted);">Expires in: </span>
+                  <span id="preview-timer" style="color:var(--accent2);font-weight:700;"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="student-name">Full Name</label>
+          <input type="text" id="student-name" placeholder="e.g. Ali Raza" />
+        </div>
+        <div class="form-group">
+          <label for="student-roll">Roll Number / Student ID</label>
+          <input type="text" id="student-roll" placeholder="e.g. 2023-CS-047" />
+        </div>
+        <div class="form-group">
+          <label for="student-session-type">Session Type</label>
+          <select id="student-session-type">
+            <option value="" disabled selected>Select type...</option>
+            <option value="Lecture">Lecture</option>
+            <option value="Laboratory">Laboratory</option>
+          </select>
+        </div>
+        <div id="alert-checkin" class="alert alert-error">An error occurred.</div>
+        <button class="btn btn-primary btn-full" onclick="markAttendance()" style="font-size:1rem;padding:16px;">
+          ✅ Mark Attendance
+        </button>
+      </div>
+
+      <!-- ── STATUS CHECKER ── -->
+      <div class="card" style="margin-top:20px;border-color:rgba(6,182,212,0.25);">
+        <div class="card-title" style="font-size:0.95rem;">🔍 Check My Attendance Status</div>
+        <div class="card-sub">Enter your Roll No. to see if you are marked present.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <input type="text" id="check-roll" placeholder="Enter Roll Number" style="flex:1;min-width:140px;" />
+          <button class="btn btn-outline" onclick="checkStatus()" style="border-color:var(--accent);color:var(--accent);">🔍 Check</button>
+        </div>
+        <div id="status-result" style="margin-top:14px;display:none;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────── ANALYTICS PANEL ───────────────── -->
+<div class="panel" id="panel-analytics">
+  <div class="container">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:32px;">
+      <div>
+        <h1 class="section-title">Analytics & Reports</h1>
+        <p class="section-sub">Detailed attendance insights and Excel export.</p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-accent" onclick="exportExcel()">📥 Export to Excel</button>
+        <button class="btn btn-outline btn-sm" onclick="renderAnalytics()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="grid-4" style="margin-bottom:28px;">
+      <div class="stat-card">
+        <div class="stat-icon">📋</div>
+        <div class="stat-value primary" id="stat-sessions">0</div>
+        <div class="stat-label">Total Sessions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-value green" id="stat-entries">0</div>
+        <div class="stat-label">Total Check-ins</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value cyan" id="stat-avg">0%</div>
+        <div class="stat-label">Avg Attendance / Session</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏆</div>
+        <div class="stat-value yellow" id="stat-best">—</div>
+        <div class="stat-label">Highest Session</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:28px;">
+      <!-- Per-Session Bar Chart -->
+      <div class="card">
+        <div class="card-title">📊 Attendance per Session</div>
+        <div class="card-sub" style="margin-bottom:16px;">Number of students per session</div>
+        <div class="chart-container">
+          <canvas id="barChart"></canvas>
+        </div>
+      </div>
+      <!-- Pie Donut -->
+      <div class="card">
+        <div class="card-title">🍩 Subject Breakdown</div>
+        <div class="card-sub" style="margin-bottom:16px;">Attendance distribution by subject</div>
+        <div class="chart-container">
+          <canvas id="pieChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Session Selector + Detailed Table -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">🗂 Sessions</div>
+        <div class="card-sub">Click a session to view its attendance.</div>
+        <div id="analytics-sessions-list">
+          <div class="empty-state"><div class="empty-icon">📂</div>No sessions yet.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Attendance Detail — <span id="detail-session-name">select a session</span></div>
+        <div class="card-sub">Full student list for the selected session.</div>
+        <div id="detail-table-wrap" class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Name</th><th>Roll / ID</th><th>Time</th><th>Status</th></tr>
+            </thead>
+            <tbody id="detail-tbody">
+              <tr><td colspan="5"><div class="empty-state"><div class="empty-icon">👆</div>Select a session</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <span id="detail-stats" style="font-size:0.8rem;color:var(--text-muted);"></span>
+          <button class="btn btn-accent btn-sm" onclick="exportSessionExcel()" id="btn-export-session" style="display:none;">
+            📥 Export This Session
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student Presence Table -->
+    <div class="card" style="margin-top:28px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+          <div class="card-title">👤 Student-wise Attendance Summary</div>
+          <div class="card-sub" style="margin:0;">Track each student's presence across all sessions.</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Roll / ID</th><th>Sessions Present</th><th>Total Sessions</th><th>Attendance %</th><th>Status</th></tr>
+          </thead>
+          <tbody id="student-summary-tbody">
+            <tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📊</div>No data yet.</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAgcBa9xlLvw9CmUMg9CICQsaVL6LJz-_o",
+  authDomain: "attendx-65999.firebaseapp.com",
+  projectId: "attendx-65999",
+  storageBucket: "attendx-65999.firebasestorage.app",
+  messagingSenderId: "988951916452",
+  appId: "1:988951916452:web:da17fcbe8142d43699db31",
+  databaseURL: "https://attendx-65999-default-rtdb.firebaseio.com"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let sessions = [];
+let activeSession = null;
+let timerInterval = null;
+let barChartInst = null;
+let pieChartInst = null;
+
+db.ref('sessions').on('value', snap => {
+  const data = snap.val();
+  sessions = [];
+  activeSession = null;
+  if (data) {
+    Object.keys(data).forEach(k => {
+      const s = data[k];
+      s.attendance = s.attendance ? Object.values(s.attendance) : [];
+      sessions.push(s);
+      if (!s.ended) activeSession = s;
+    });
+  }
+  updateLiveList();
+  updatePastSessions();
+  
+  if(activeSession) {
+    showActiveSession();
+    const rem = Math.max(0, Math.floor((new Date(activeSession.expiresAt) - new Date()) / 1000));
+    if (rem > 0) { if(!timerInterval) startTimer(rem); } else endSession();
+  } else {
+    document.getElementById('no-session').style.display = 'block';
+    document.getElementById('active-session').style.display = 'none';
+    document.getElementById('live-list-card').style.display = 'none';
+  }
+  
+  if(document.getElementById('tab-analytics').classList.contains('active')) renderAnalytics();
+});
+
+function showAlert(el, type, msg) { el.className = 'alert alert-' + type; el.innerHTML = msg; el.style.display = 'block'; }
+function hideAlert(el) { el.style.display = 'none'; }
+const esc = s => { const div = document.createElement('div'); div.appendChild(document.createTextNode(s)); return div.innerHTML; };
+
+function switchTab(tab) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'analytics') renderAnalytics();
+}
+
+function genCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let c = '';
+  for (let i = 0; i < 6; i++) c += chars[Math.floor(Math.random() * chars.length)];
+  return c;
+}
+
+const COURSES = {
+  '1': { subject: 'Dairy Process Instrumentation and Control', program: 'B.Tech. Dairy Technology', code: '202200506' },
+  '2': { subject: 'Industrial Machining Processes', program: 'Diploma in HME', code: '102920301' }
+};
+
+function onCourseChange() {
+  const val = document.getElementById('session-course').value;
+  const details = document.getElementById('course-details');
+  if (!val) { details.style.display = 'none'; return; }
+  const c = COURSES[val];
+  document.getElementById('cd-name').textContent = c.subject;
+  document.getElementById('cd-program').textContent = c.program;
+  document.getElementById('cd-code').textContent = c.code;
+  document.getElementById('session-subject').value = c.subject;
+  document.getElementById('session-class').value = c.program + ' [' + c.code + ']';
+  details.style.display = 'block';
+}
+
+function createSession() {
+  const subject = document.getElementById('session-subject').value.trim();
+  const cls = document.getElementById('session-class').value.trim();
+  const teacher = document.getElementById('session-teacher').value.trim();
+  const duration = parseInt(document.getElementById('session-duration').value);
+  const sessionDate = document.getElementById('session-date').value;
+  const sessionType = document.getElementById('session-type').value;
+  const alert = document.getElementById('alert-create');
+
+  if (!subject || !cls) { showAlert(alert, 'error', 'Please select a course before generating a code.'); return; }
+  if (!sessionType) { showAlert(alert, 'error', 'Please select a session type (Lecture/Laboratory).'); return; }
+  if (!sessionDate) { showAlert(alert, 'error', 'Please select a class date.'); return; }
+  hideAlert(alert);
+
+  if (activeSession) endSession(true);
+
+  const code = genCode();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + duration * 60000);
+  const id = Date.now().toString();
+
+  const newSession = {
+    id: id,
+    code,
+    subject,
+    class: cls,
+    teacher,
+    duration,
+    sessionDate,
+    sessionType,
+    createdAt: now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    attendance: [],
+    ended: false
+  };
+  db.ref('sessions/' + id).set(newSession);
+}
+
+function showActiveSession() {
+  document.getElementById('no-session').style.display = 'none';
+  document.getElementById('active-session').style.display = 'block';
+  document.getElementById('code-display').textContent = activeSession.code;
+  document.getElementById('active-subject').textContent = activeSession.subject;
+  const dateStr = activeSession.sessionDate ? ' · 📅 ' + new Date(activeSession.sessionDate + 'T00:00:00').toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : '';
+  document.getElementById('active-class').textContent = activeSession.class + ' · ' + activeSession.teacher + dateStr + ' · ' + (activeSession.sessionType || 'Session');
+  document.getElementById('code-expire-text').textContent = `Expires at ${new Date(activeSession.expiresAt).toLocaleTimeString()}`;
+  document.getElementById('live-list-card').style.display = 'block';
+  updateLiveList();
+}
+
+function startTimer(totalSecs) {
+  let remaining = totalSecs;
+  const circumference = 326.73;
+  const prog = document.getElementById('timer-prog');
+
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    remaining--;
+    const pct = remaining / (activeSession ? activeSession.duration * 60 : totalSecs);
+    prog.style.strokeDashoffset = circumference * (1 - Math.max(0, pct));
+    const m = Math.max(0, Math.floor(remaining / 60));
+    const s = Math.max(0, remaining % 60);
+    document.getElementById('timer-mins').textContent = m;
+    document.getElementById('timer-secs').textContent = ':' + String(s).padStart(2,'0');
+
+    if (pct < 0.25) prog.style.stroke = '#f43f5e';
+    else if (pct < 0.5) prog.style.stroke = '#f59e0b';
+    else prog.style.stroke = 'url(#timerGrad)';
+
+    if (remaining <= 0) {
+      clearInterval(timerInterval);
+      endSession();
+    }
+  }, 1000);
+}
+
+function endSession(silent = false) {
+  clearInterval(timerInterval);
+  if (activeSession) db.ref('sessions/' + activeSession.id).update({ ended: true, endedAt: new Date().toISOString() });
+}
+
+function updateLiveList() {
+  const t = document.getElementById('live-attendance-tbody');
+  const countEl = document.getElementById('live-count');
+  if (!activeSession) {
+    countEl.textContent = '0';
+    t.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">⏳</div>Waiting for students...</div></td></tr>';
+    return;
+  }
+  const att = activeSession.attendance || [];
+  countEl.textContent = att.length;
+  if (!att.length) {
+    t.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">⏳</div>Waiting for students...</div></td></tr>';
+    return;
+  }
+  t.innerHTML = '';
+  const sorted = [...att].sort((a,b) => new Date(b.time) - new Date(a.time));
+  sorted.forEach((a, i) => {
+    t.innerHTML += `<tr><td>${i+1}</td><td style="font-weight:600;">${esc(a.name)}</td><td style="font-family:monospace;color:var(--primary-light);">${esc(a.roll)}</td><td style="color:var(--text-muted);">${new Date(a.time).toLocaleTimeString()}</td></tr>`;
+  });
+}
+
+function updatePastSessions() {
+  const c = document.getElementById('past-sessions-list');
+  if (!c) return;
+  const past = sessions.filter(s => s.ended).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+  if (!past.length) { c.innerHTML = '<div class="empty-state"><div class="empty-icon">📁</div>No past sessions found.</div>'; return; }
+  c.innerHTML = '';
+  past.forEach((s, i) => {
+    const classDate = s.sessionDate ? new Date(s.sessionDate + 'T00:00:00').toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : new Date(s.createdAt).toLocaleDateString();
+    const count = (s.attendance || []).length;
+    c.innerHTML += `<div class="session-item"><div class="session-dot" style="background:var(--accent2);"></div><div class="session-info"><div class="session-name">${esc(s.subject)} <span style="font-size:0.8rem;color:var(--primary);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;margin-left:6px;">${s.sessionType || 'Session'}</span></div><div class="session-meta">📅 ${classDate} · ${esc(s.teacher)}</div></div><span class="badge badge-green">${count} present</span><button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem;" onclick="exportSingleExcel('${s.id}')">⬇ XLS</button></div>`;
+  });
+}
+
+function renderAnalytics() {
+  const sel = document.getElementById('analytic-session-select');
+  const oldVal = sel.value;
+  sel.innerHTML = '<option value="ALL">All Sessions (Overall)</option>';
+  sessions.forEach(s => {
+    const d = s.sessionDate ? new Date(s.sessionDate + 'T00:00:00').toLocaleDateString() : new Date(s.createdAt).toLocaleDateString();
+    sel.innerHTML += `<option value="${s.id}">${esc(s.subject)} (${d})</option>`;
+  });
+  if (sessions.find(s => s.id === oldVal)) sel.value = oldVal;
+  updateAnalyticsViews();
+}
+
+function updateAnalyticsViews() {
+  const selId = document.getElementById('analytic-session-select').value;
+  let targetSessions = (selId === 'ALL') ? sessions : sessions.filter(s => s.id === selId);
+  if (!targetSessions.length) return;
+
+  const totalPossible = targetSessions.length;
+  let presentCounts = [];
+  targetSessions.forEach(s => presentCounts.push((s.attendance || []).length));
+  const avgPresent = presentCounts.length ? Math.round(presentCounts.reduce((a,b)=>a+b,0)/presentCounts.length) : 0;
+  
+  document.getElementById('stat-total-sessions').textContent = totalPossible;
+  document.getElementById('stat-avg-present').textContent = avgPresent;
+
+  const studentMap = {};
+  targetSessions.forEach(s => {
+    (s.attendance || []).forEach(a => {
+      const k = a.roll.toLowerCase();
+      if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, present: 0 };
+      studentMap[k].present++;
+    });
+  });
+
+  const studentList = Object.values(studentMap);
+  const bestCount = studentList.filter(s => s.present === totalPossible).length;
+  document.getElementById('stat-best-attendance').textContent = bestCount;
+
+  const tbody = document.getElementById('student-summary-tbody');
+  if (!studentList.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📊</div>No data yet.</div></td></tr>';
+  } else {
+    tbody.innerHTML = '';
+    studentList.sort((a,b) => b.present - a.present).forEach(st => {
+      const pct = totalPossible ? Math.round((st.present/totalPossible)*100) : 0;
+      let badge = 'badge-green'; if (pct < 50) badge = 'badge-red'; else if (pct < 75) badge = 'badge-yellow';
+      tbody.innerHTML += `<tr><td style="font-weight:600;">${esc(st.name)}</td><td style="font-family:monospace;color:var(--primary-light);">${esc(st.roll)}</td><td>${st.present}</td><td>${totalPossible}</td><td>${pct}%</td><td><span class="badge ${badge}">${pct >= 75 ? 'Good' : pct >= 50 ? 'Warning' : 'Low'}</span></td></tr>`;
+    });
+  }
+
+  const ctxBar = document.getElementById('barChart').getContext('2d');
+  const ctxPie = document.getElementById('pieChart').getContext('2d');
+  if (barChartInst) barChartInst.destroy();
+  if (pieChartInst) pieChartInst.destroy();
+
+  const labels = targetSessions.map((s,i) => `S${i+1}`);
+  barChartInst = new Chart(ctxBar, { type: 'bar', data: { labels, datasets: [{ label: 'Students Present', data: presentCounts, backgroundColor: '#6366f1', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }, x: { grid: { display: false }, ticks: { color: '#94a3b8' } } } } });
+
+  const low = studentList.filter(s => (s.present/totalPossible) < 0.5).length;
+  const med = studentList.filter(s => (s.present/totalPossible) >= 0.5 && (s.present/totalPossible) < 0.75).length;
+  const high = studentList.filter(s => (s.present/totalPossible) >= 0.75).length;
+  pieChartInst = new Chart(ctxPie, { type: 'doughnut', data: { labels: ['< 50%', '50-74%', '75-100%'], datasets: [{ data: [low, med, high], backgroundColor: ['#f43f5e', '#f59e0b', '#10b981'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 20 } } }, cutout: '70%' } });
+}
+
+function exportExcel() {
+  if (!sessions.length) return;
+  const wb = XLSX.utils.book_new();
+
+  const summaryRows = [['AttendX — Attendance Summary Report'], ['Generated:', new Date().toLocaleString()], []];
+  summaryRows.push(['Session #', 'Subject', 'Type', 'Class', 'Teacher', 'Class Date', 'Session Created', 'Duration (min)', 'Code', 'Students Present']);
+  sessions.forEach((s, i) => {
+    const d = new Date(s.createdAt);
+    const classDate = s.sessionDate ? new Date(s.sessionDate + 'T00:00:00').toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : d.toLocaleDateString();
+    summaryRows.push([i+1, s.subject, s.sessionType || '-', s.class, s.teacher, classDate, d.toLocaleDateString() + ' ' + d.toLocaleTimeString(), s.duration, s.code, (s.attendance || []).length]);
+  });
+  const summaryWs = XLSX.utils.aoa_to_sheet(summaryRows);
+  summaryWs['!cols'] = [8,20,15,20,12,12,15,10,18].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
+
+  sessions.forEach((s, i) => {
+    const classDate = s.sessionDate ? new Date(s.sessionDate + 'T00:00:00').toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : new Date(s.createdAt).toLocaleDateString();
+    const rows = [[`Subject: ${s.subject}`, '', `Class: ${s.class}`], [`Type: ${s.sessionType || '-'}`, '', `Teacher: ${s.teacher}`], [`Code: ${s.code}`, '', `Class Date: ${classDate}`], []];
+    rows.push(['#', 'Student Name', 'Roll / Student ID', 'Check-in Time', 'Status']);
+    const att = s.attendance || [];
+    if (att.length) { att.forEach((a, j) => { rows.push([j+1, a.name, a.roll, new Date(a.time).toLocaleTimeString(), 'Present']); }); } else { rows.push(['', 'No attendance recorded', '', '', '']); }
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [5, 25, 20, 16, 10].map(w => ({ wch: w }));
+    const sheetName = `${s.subject.slice(0,18)}_${i+1}`.replace(/[^a-zA-Z0-9_]/g, '_');
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  });
+
+  const studentMap = {};
+  sessions.forEach(s => {
+    (s.attendance || []).forEach(a => {
+      const key = a.roll.toLowerCase();
+      if (!studentMap[key]) studentMap[key] = { name: a.name, roll: a.roll, present: 0 };
+      studentMap[key].present++;
+    });
+  });
+  const studentRows = [['Student Summary'], ['Total Sessions:', sessions.length], []];
+  studentRows.push(['Roll / ID', 'Student Name', 'Sessions Attended', 'Attendance %']);
+  Object.values(studentMap).sort((a,b) => b.present - a.present).forEach(st => {
+    const pct = sessions.length ? Math.round((st.present/sessions.length)*100) : 0;
+    studentRows.push([st.roll, st.name, st.present, pct + '%']);
+  });
+  const studentWs = XLSX.utils.aoa_to_sheet(studentRows);
+  studentWs['!cols'] = [20, 25, 18, 15].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, studentWs, 'Student Summary');
+
+  XLSX.writeFile(wb, 'AttendX_Complete_Report.xlsx');
+}
+
+function exportSingleExcel(id) {
+  const s = sessions.find(x => x.id === id);
+  if (!s) return;
+
+  const wb = XLSX.utils.book_new();
+  const classDate = s.sessionDate ? new Date(s.sessionDate + 'T00:00:00').toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : new Date(s.createdAt).toLocaleDateString();
+  const rows = [[`Subject: ${s.subject}`, '', `Class: ${s.class}`], [`Type: ${s.sessionType || '-'}`, '', `Teacher: ${s.teacher}`], [`Code: ${s.code}`, '', `Class Date: ${classDate}`], []];
+  rows.push(['#', 'Student Name', 'Roll / Student ID', 'Check-in Time', 'Status']);
+  (s.attendance || []).forEach((a, j) => rows.push([j+1, a.name, a.roll, new Date(a.time).toLocaleTimeString(), 'Present']));
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [5, 25, 20, 16, 10].map(w => ({ wch: w }));
+  const filename = `AttendX_${s.subject.slice(0,10)}_${s.sessionDate || s.createdAt.slice(0,10)}.xlsx`.replace(/[^a-zA-Z0-9_.]/g, '_');
+  XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+  XLSX.writeFile(wb, filename);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const dateEl = document.getElementById('session-date');
+  if (dateEl) dateEl.value = today;
+});
+</script>
+</body>
+</html>
