@@ -923,10 +923,11 @@
               <th>Theory %</th>
               <th>Lab %</th>
               <th>Overall %</th>
+              <th>Excel</th>
             </tr>
           </thead>
           <tbody id="subject-breakdown-tbody">
-            <tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📊</div>No sessions yet.</div></td></tr>
+            <tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📊</div>No sessions yet.</div></td></tr>
           </tbody>
         </table>
       </div>
@@ -1362,7 +1363,6 @@ function renderSubjectTable(targetSessions) {
   const tbody = document.getElementById('subject-breakdown-tbody');
   if (!tbody) return;
 
-  // Group by subject
   const subjectMap = {};
   targetSessions.forEach(s => {
     const key = s.subject;
@@ -1375,7 +1375,7 @@ function renderSubjectTable(targetSessions) {
 
   const rows = Object.values(subjectMap);
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📊</div>No sessions yet.</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📊</div>No sessions yet.</div></td></tr>';
     return;
   }
 
@@ -1393,20 +1393,40 @@ function renderSubjectTable(targetSessions) {
 
     const theoryBar = theoryPct !== null ? `<div class="mini-bar-track" style="margin-top:4px;"><div class="mini-bar-fill theory" style="width:${theoryPct}%;"></div></div>` : '';
     const labBar    = labPct    !== null ? `<div class="mini-bar-track" style="margin-top:4px;"><div class="mini-bar-fill lab" style="width:${labPct}%;"></div></div>` : '';
+    const subjKey   = r.subject.replace(/'/g, "\\'");
 
     tbody.innerHTML += `
       <tr>
         <td class="subject-name">${esc(r.subject)}</td>
-        <td class="num">${r.theorySessions}</td>
-        <td class="num" style="color:var(--accent);">${r.labSessions}</td>
-        <td class="num">${r.theoryPresent}</td>
-        <td class="num" style="color:var(--accent);">${r.labPresent}</td>
-        <td>${theoryPill}<div style="margin-top:4px;">${theoryBar}</div></td>
-        <td>${labPill}<div style="margin-top:4px;">${labBar}</div></td>
+        <td class="num" style="font-weight:700;">${r.theorySessions}${theoryBar}</td>
+        <td class="num" style="font-weight:700;color:var(--accent);">${r.labSessions}${labBar}</td>
+        <td>${theoryPill}</td>
+        <td>${labPill}</td>
         <td>${overallPill}</td>
+        <td>
+          <button class="btn btn-accent btn-sm" style="padding:5px 11px;font-size:0.75rem;white-space:nowrap;"
+            onclick="exportSubjectExcel('${subjKey}')">📥 Excel</button>
+        </td>
       </tr>`;
   });
 }
+
+/* ─── Per-Subject Excel Export ─── */
+async function exportSubjectExcel(subjectName) {
+  const subjectSessions = sessions.filter(s => s.subject === subjectName);
+  if (!subjectSessions.length) { alert('No sessions found for: ' + subjectName); return; }
+
+  const dates    = subjectSessions.map(s => s.sessionDate || s.createdAt.slice(0,10)).sort();
+  const fromDate = dates[0];
+  const toDate   = dates[dates.length - 1];
+
+  try {
+    await exportExcelAdvanced(subjectSessions, fromDate, toDate, subjectName, '', '', 'Both');
+  } catch(e) {
+    alert('Export failed: ' + e.message);
+  }
+}
+
 
 function updateAnalyticsViews() {
   const selId = document.getElementById('analytic-session-select').value;
