@@ -895,12 +895,18 @@
           <canvas id="barChart"></canvas>
         </div>
       </div>
-      <!-- Pie Donut -->
+      <!-- Distribution Charts: subject-wise Theory + Lab -->
       <div class="card">
         <div class="card-title">🍩 Attendance Distribution</div>
-        <div class="card-sub" style="margin-bottom:16px;">Attendance range across all students</div>
-        <div class="chart-container">
-          <canvas id="pieChart"></canvas>
+        <div class="card-sub" style="margin-bottom:12px;">Subject-wise Theory &amp; Lab — student distribution</div>
+        <!-- Colour legend -->
+        <div style="display:flex;gap:14px;margin-bottom:12px;flex-wrap:wrap;">
+          <span style="display:flex;align-items:center;gap:5px;font-size:0.72rem;color:#94a3b8;"><span style="width:10px;height:10px;border-radius:50%;background:#10b981;display:inline-block;"></span>75-100%</span>
+          <span style="display:flex;align-items:center;gap:5px;font-size:0.72rem;color:#94a3b8;"><span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>50-74%</span>
+          <span style="display:flex;align-items:center;gap:5px;font-size:0.72rem;color:#94a3b8;"><span style="width:10px;height:10px;border-radius:50%;background:#f43f5e;display:inline-block;"></span>&lt;50%</span>
+        </div>
+        <div id="dist-charts-wrap" style="overflow-y:auto;max-height:280px;padding-right:4px;">
+          <div class="empty-state"><div class="empty-icon">📊</div>No sessions yet.</div>
         </div>
       </div>
     </div>
@@ -1038,7 +1044,7 @@ let sessions = [];
 let activeSession = null;
 let timerInterval = null;
 let barChartInst = null;
-let pieChartInst = null;
+let pieChartInsts = [];  // array — one per subject×type
 let selectedSessionId = null;
 
 db.ref('sessions').on('value', snap => {
@@ -1547,12 +1553,10 @@ function updateAnalyticsViews() {
   }
 
   // ── Charts ──
-
   if (!targetSessions.length) return;
   const ctxBar = document.getElementById('barChart').getContext('2d');
-  const ctxPie = document.getElementById('pieChart').getContext('2d');
   if (barChartInst) barChartInst.destroy();
-  if (pieChartInst) pieChartInst.destroy();
+  pieChartInsts.forEach(c => c && c.destroy()); pieChartInsts = [];
 
   // ── Bar Chart: Attendance per Session (date + subject labels) ──
   const fmtD = d => { const dt = new Date((d||'')+'T00:00:00'); return `${dt.getDate()}/${dt.getMonth()+1}`; };
@@ -1578,38 +1582,104 @@ function updateAnalyticsViews() {
     }
   });
 
-  // ── Pie/Doughnut Chart: Attendance Distribution ──
-  // Per-student overall % across all sessions in targetSessions
-  const totalSessions = targetSessions.length;
-  const studentAttMap = {}; // normName → present count
-  targetSessions.forEach(s => {
-    (s.attendance || []).forEach(a => {
-      const k = (a.name||'').trim().replace(/\s+/g,' ').toLowerCase();
-      if (!k) return;
-      studentAttMap[k] = (studentAttMap[k] || 0) + 1;
-    });
-  });
-  const attCounts = Object.values(studentAttMap);
-  const low  = attCounts.filter(c => totalSessions > 0 && (c/totalSessions) <  0.50).length;
-  const med  = attCounts.filter(c => totalSessions > 0 && (c/totalSessions) >= 0.50 && (c/totalSessions) < 0.75).length;
-  const high = attCounts.filter(c => totalSessions > 0 && (c/totalSessions) >= 0.75).length;
+  // ── Distribution: subject-wise Theory + Lab doughnut pairs ──
+  const normN = n => (n||'').trim().replace(/\s+/g,' ').toLowerCase();
+  const subjects = [...new Set(targetSessions.map(s => s.subject))].sort();
+  const wrap = document.getElementById('dist-charts-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '';
 
-  pieChartInst = new Chart(ctxPie, {
-    type: 'doughnut',
-    data: {
-      labels: ['< 50%', '50-74%', '75-100%'],
-      datasets: [{ data: [low || 0, med || 0, high || 0], backgroundColor: ['#f43f5e', '#f59e0b', '#10b981'], borderWidth: 0, hoverOffset: 6 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 20, font: { size: 12 } } },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} student${ctx.raw !== 1 ? 's' : ''}` } }
+  if (!subjects.length) {
+    wrap.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div>No data yet.</div>';
+    return;
+  }
+
+  // Helper: compute distribution for a set of sessions
+  function computeDist(sessions) {
+    const total = sessions.length;
+    if (!total) return null;
+    const cnt = {};
+    sessions.forEach(s => (s.attendance||[]).forEach(a => {
+      const k = normN(a.name); if (k) cnt[k] = (cnt[k]||0) + 1;
+    }));
+    const vals = Object.values(cnt);
+    return {
+      low : vals.filter(c => c/total < 0.50).length,
+      med : vals.filter(c => c/total >= 0.50 && c/total < 0.75).length,
+      high: vals.filter(c => c/total >= 0.75).length,
+      total: vals.length  // unique students
+    };
+  }
+
+  // Helper: create a mini doughnut inside a given canvas ID
+  function makeDoughnut(canvasId, dist, accentColor) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !dist) return;
+    const chart = new Chart(canvas.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: ['< 50%', '50-74%', '75-100%'],
+        datasets: [{ data: [dist.low||0, dist.med||0, dist.high||0],
+          backgroundColor: ['#f43f5e','#f59e0b','#10b981'], borderWidth: 0, hoverOffset: 4 }]
       },
-      cutout: '68%'
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} student${ctx.raw!==1?'s':''}` } }
+        },
+        cutout: '62%'
+      }
+    });
+    pieChartInsts.push(chart);
+  }
+
+  subjects.forEach(subj => {
+    const tSess = targetSessions.filter(s => s.subject===subj && (s.sessionType||'').toLowerCase() !== 'laboratory');
+    const lSess = targetSessions.filter(s => s.subject===subj && (s.sessionType||'').toLowerCase() === 'laboratory');
+    const tDist = computeDist(tSess);
+    const lDist = computeDist(lSess);
+    const sKey  = subj.replace(/[^a-z0-9]/gi,'_');
+
+    const block = document.createElement('div');
+    block.style.cssText = 'margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.06);';
+
+    // Subject title
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:0.78rem;font-weight:700;color:var(--text);margin-bottom:10px;';
+    title.textContent = subj;
+    block.appendChild(title);
+
+    // Row of mini doughnuts
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:10px;align-items:flex-start;';
+
+    const makeMini = (id, label, color, dist, sessCount) => {
+      if (!dist) return '';
+      return `<div style="flex:1;text-align:center;">
+        <div style="font-size:0.68rem;font-weight:600;color:${color};margin-bottom:4px;">${label} (${sessCount})</div>
+        <div style="position:relative;height:88px;"><canvas id="${id}"></canvas></div>
+        <div style="margin-top:4px;font-size:0.68rem;color:var(--text-muted);">
+          🟢 ${dist.high} &nbsp; 🟡 ${dist.med} &nbsp; 🔴 ${dist.low}
+        </div>
+      </div>`;
+    };
+
+    row.innerHTML =
+      makeMini(`dist-t-${sKey}`, '🎓 Theory', 'var(--primary-light)', tDist, tSess.length + ' lec.') +
+      makeMini(`dist-l-${sKey}`, '🔬 Lab',    'var(--accent)',        lDist, lSess.length + ' sess.');
+
+    if (!tDist && !lDist) {
+      row.innerHTML = '<span style="color:var(--text-muted);font-size:0.78rem;">No sessions</span>';
     }
+
+    block.appendChild(row);
+    wrap.appendChild(block);
+
+    // Render canvases now that they exist in DOM
+    if (tDist) makeDoughnut(`dist-t-${sKey}`, tDist, 'var(--primary-light)');
+    if (lDist) makeDoughnut(`dist-l-${sKey}`, lDist, 'var(--accent)');
   });
-}
 
 /* ─── Export Modal ─── */
 function openExportModal() {
