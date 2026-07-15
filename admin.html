@@ -1366,9 +1366,11 @@ function renderSubjectTable(targetSessions) {
   const subjectMap = {};
   targetSessions.forEach(s => {
     const key = s.subject;
-    if (!subjectMap[key]) subjectMap[key] = { subject: key, theorySessions: 0, labSessions: 0, theoryPresent: 0, labPresent: 0 };
+    if (!subjectMap[key]) subjectMap[key] = { subject: key, theorySessions: 0, labSessions: 0, theoryPresent: 0, labPresent: 0, uniqueStudents: new Set() };
     const isLab = (s.sessionType || '').toLowerCase() === 'laboratory';
     const presentCount = (s.attendance || []).length;
+    // Track unique students who attended any session of this subject
+    (s.attendance || []).forEach(a => subjectMap[key].uniqueStudents.add(a.roll.toLowerCase()));
     if (isLab) { subjectMap[key].labSessions++; subjectMap[key].labPresent += presentCount; }
     else { subjectMap[key].theorySessions++; subjectMap[key].theoryPresent += presentCount; }
   });
@@ -1381,11 +1383,13 @@ function renderSubjectTable(targetSessions) {
 
   tbody.innerHTML = '';
   rows.forEach(r => {
-    const theoryPct  = r.theorySessions > 0 ? Math.round((r.theoryPresent / r.theorySessions) * 100) : null;
-    const labPct     = r.labSessions    > 0 ? Math.round((r.labPresent    / r.labSessions)    * 100) : null;
+    // Class-average attendance % = totalPresent / (sessions × uniqueStudents)
+    const n = r.uniqueStudents.size || 1;
+    const theoryPct  = r.theorySessions > 0 ? Math.round((r.theoryPresent / (r.theorySessions * n)) * 100) : null;
+    const labPct     = r.labSessions    > 0 ? Math.round((r.labPresent    / (r.labSessions    * n)) * 100) : null;
     const totalS     = r.theorySessions + r.labSessions;
     const totalP     = r.theoryPresent  + r.labPresent;
-    const overallPct = totalS > 0 ? Math.round((totalP / totalS) * 100) : null;
+    const overallPct = totalS > 0 ? Math.round((totalP / (totalS * n)) * 100) : null;
 
     const theoryPill  = theoryPct  !== null ? pctPill(theoryPct)  : '<span style="color:var(--text-muted);">—</span>';
     const labPill     = labPct     !== null ? pctPill(labPct)     : '<span style="color:var(--text-muted);">—</span>';
@@ -1972,7 +1976,6 @@ async function exportExcelAdvanced(filtered, fromDate, toDate, subjectFilter, se
         cell.alignment = { horizontal: i<=1||i>=5?'center':'left', vertical:'middle' };
         cell.border    = { right:{ style:'thin', color:{ argb: C.border } } };
       }
-      if (i >= 7) r.getCell(10).font = { bold:true, size:9, color:{ argb: pctColor } };
     });
 
     /* Totals */
