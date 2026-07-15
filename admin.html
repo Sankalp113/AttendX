@@ -1445,296 +1445,353 @@ async function runExportAdvanced() {
 /* ─── Multi-sheet Excel Export — ExcelJS (full styling) ─── */
 async function exportExcelAdvanced(filtered, fromDate, toDate, subjectFilter, semester, division, exportType) {
   const WB = new ExcelJS.Workbook();
-  WB.creator  = 'AttendX';
-  WB.created  = new Date();
+  WB.creator = 'AttendX'; WB.created = new Date();
 
-  // ── Color palette (6-char ARGB without alpha) ──
+  /* ── ARGB colours (8-char, FF = fully opaque) ── */
   const C = {
-    indigo:      '6366F1',
-    indigoDark:  '1E2139',
-    indigoLight: 'EEF2FF',
-    cyan:        '06B6D4',
-    green:       '10B981',
-    amber:       'F59E0B',
-    red:         'EF4444',
-    white:       'FFFFFFFF',
-    offwhite:    'F8FAFC',
-    text:        '1E293B',
-    muted:       '64748B',
+    indigoDark : 'FF1E2139', indigo     : 'FF6366F1', indigoLight: 'FFEEF2FF',
+    tealLight  : 'FFE0F7FA', green      : 'FF10B981', greenLight  : 'FFECFDF5',
+    red        : 'FFEF4444', redLight   : 'FFFEF2F2', amber       : 'FFF59E0B',
+    white      : 'FFFFFFFF', offwhite   : 'FFF8FAFC', border      : 'FFCBD5E1',
+    text       : 'FF1E293B', muted      : 'FF64748B',
   };
 
-  const theorySessions = filtered.filter(s => (s.sessionType||'').toLowerCase() !== 'laboratory');
-  const labSessions    = filtered.filter(s => (s.sessionType||'').toLowerCase() === 'laboratory');
+  /* ── Column-letter helper (1-based) ── */
+  function CL(n) {
+    let r = '';
+    while (n > 0) { n--; r = String.fromCharCode(65 + n % 26) + r; n = Math.floor(n / 26); }
+    return r;
+  }
 
-  // ── Build student map ──
+  /* ── Short date: "23.6.25" format ── */
+  function fmtShort(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T00:00:00');
+    return `${d.getDate()}.${d.getMonth()+1}.${String(d.getFullYear()).slice(2)}`;
+  }
+
+  /* ── Sorted session lists ── */
+  const sortByDate = arr => arr.slice().sort((a,b) =>
+    (a.sessionDate||a.createdAt.slice(0,10)).localeCompare(b.sessionDate||b.createdAt.slice(0,10)));
+
+  const theorySessions = sortByDate(filtered.filter(s => (s.sessionType||'').toLowerCase() !== 'laboratory'));
+  const labSessions    = sortByDate(filtered.filter(s => (s.sessionType||'').toLowerCase() === 'laboratory'));
+
+  /* ── Build student list & attendance lookup ── */
   const studentMap = {};
-  const addStudent = (a, k) => {
-    if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, theoryPresent: 0, labPresent: 0, theoryRecords: [], labRecords: [] };
-  };
-  theorySessions.forEach(s => (s.attendance||[]).forEach(a => {
-    const k = a.roll.toLowerCase(); addStudent(a, k);
-    studentMap[k].theoryPresent++;
-    studentMap[k].theoryRecords.push({ date: s.sessionDate||s.createdAt.slice(0,10), time: a.time });
+  filtered.forEach(s => (s.attendance||[]).forEach(a => {
+    const k = a.roll.toLowerCase();
+    if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, classInfo: s.class||'' };
   }));
-  labSessions.forEach(s => (s.attendance||[]).forEach(a => {
-    const k = a.roll.toLowerCase(); addStudent(a, k);
-    studentMap[k].labPresent++;
-    studentMap[k].labRecords.push({ date: s.sessionDate||s.createdAt.slice(0,10), time: a.time });
+  const students = Object.values(studentMap).sort((a,b) => a.roll.localeCompare(b.roll));
+
+  /* lookup[studentKey][sessionId] = true */
+  const lookup = {};
+  filtered.forEach(s => (s.attendance||[]).forEach(a => {
+    const k = a.roll.toLowerCase();
+    if (!lookup[k]) lookup[k] = {};
+    lookup[k][s.id] = true;
   }));
-  filtered.forEach(s => (s.attendance||[]).forEach(a => addStudent(a, a.roll.toLowerCase())));
-  const students = Object.values(studentMap).sort((a, b) => a.roll.localeCompare(b.roll));
 
-  const dateRangeLabel = `${fmtDate(fromDate)}  →  ${fmtDate(toDate)}`;
-  const exportedAt     = new Date().toLocaleString('en-IN');
+  /* ── Extract course info from session data ── */
+  const first        = filtered[0] || {};
+  const courseCode   = (first.class||'').match(/\[([^\]]+)\]/)?.[1] || '';
+  const department   = (first.class||'').replace(/\[.*?\]/g,'').trim();
+  const courseName   = subjectFilter === 'ALL' ? (first.subject||'All Subjects') : subjectFilter;
 
-  /* ── Add institute header block to a worksheet ── */
-  function addHeaderBlock(ws, sheetTitle, typeLabel, ncols) {
-    const merge = n => `A${n}:${String.fromCharCode(64 + ncols)}${n}`;
+  /* ════════════════════════════════════════════════════════
+     buildMatrixSheet — one row per student, one col per session
+  ════════════════════════════════════════════════════════ */
+  function buildMatrixSheet(sheetName, sessions, typeLabel) {
+    if (!sessions.length && students.length === 0) return;
 
-    // Banner row
+    const ws     = WB.addWorksheet(sheetName);
+    const nFixed = 4;                        // Sr.No | Enrollment | Name | Dept
+    const nDates = sessions.length;
+    const nSum   = 4;                        // Total P | Total A | Total Sessions | Att%
+    const nTotal = nFixed + nDates + nSum;
+    const lastCL = CL(nTotal);
+
+    /* Column widths */
+    const widths = [{ width:5 }, { width:16 }, { width:22 }, { width:16 }];
+    for (let i=0; i<nDates; i++) widths.push({ width: 4.2 });
+    widths.push({ width:8 }, { width:8 }, { width:8 }, { width:10 });
+    ws.columns = widths;
+
+    /* ── ROW 1: Institution banner ── */
     ws.addRow(['AttendX — Smart Attendance System']);
-    const r1 = ws.lastRow; r1.height = 30;
-    ws.mergeCells(merge(r1.number));
-    const c1 = r1.getCell(1);
-    c1.value = 'AttendX — Smart Attendance System';
-    c1.font      = { bold: true, size: 14, color: { argb: C.white } };
-    c1.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.indigo } };
-    c1.alignment = { horizontal: 'left', vertical: 'middle' };
+    const r1 = ws.lastRow; r1.height = 26;
+    ws.mergeCells(`A1:${lastCL}1`);
+    Object.assign(r1.getCell(1), {
+      value: 'AttendX — Smart Attendance System',
+      font:      { bold:true, size:13, color:{ argb: C.indigoDark } },
+      alignment: { horizontal:'center', vertical:'middle' },
+    });
 
-    // Subtitle
-    ws.addRow([sheetTitle]);
+    /* ── ROW 2: Department ── */
+    ws.addRow([department||'Department']);
     const r2 = ws.lastRow; r2.height = 20;
-    ws.mergeCells(merge(r2.number));
-    const c2 = r2.getCell(1);
-    c2.value = sheetTitle;
-    c2.font      = { bold: true, size: 10, color: { argb: C.white } };
-    c2.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.indigoDark } };
-    c2.alignment = { horizontal: 'left', vertical: 'middle' };
-
-    // Info rows
-    const info = [
-      ['Date Range', dateRangeLabel],
-      ['Subject',    subjectFilter === 'ALL' ? 'All Subjects' : subjectFilter],
-      ['Type',       typeLabel],
-    ];
-    if (semester) info.push(['Semester', semester]);
-    if (division) info.push(['Division', division]);
-    info.push(['Exported', exportedAt]);
-
-    info.forEach(([lbl, val]) => {
-      ws.addRow([lbl, val]);
-      const r = ws.lastRow; r.height = 16;
-      // merge value cells
-      if (ncols > 2) ws.mergeCells(`B${r.number}:${String.fromCharCode(64+ncols)}${r.number}`);
-      const cL = r.getCell(1);
-      cL.font = { bold: true, size: 9, color: { argb: C.indigo } };
-      cL.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.indigoLight } };
-      cL.alignment = { horizontal: 'left', vertical: 'middle' };
-      const cV = r.getCell(2);
-      cV.font = { size: 9, color: { argb: C.text } };
-      cV.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.indigoLight } };
-      cV.alignment = { horizontal: 'left', vertical: 'middle' };
+    ws.mergeCells(`A2:${lastCL}2`);
+    Object.assign(r2.getCell(1), {
+      value: department||'Department',
+      font:      { bold:true, size:11, color:{ argb: C.indigoDark } },
+      alignment: { horizontal:'center', vertical:'middle' },
     });
-    ws.addRow([]); // spacer
-  }
 
-  /* ── Column header row ── */
-  function addColHeaders(ws, cols) {
-    ws.addRow(cols);
-    const r = ws.lastRow; r.height = 24;
-    cols.forEach((_, i) => {
-      const cell = r.getCell(i + 1);
-      cell.font      = { bold: true, size: 10, color: { argb: C.white } };
-      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.indigoDark } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border    = { bottom: { style: 'medium', color: { argb: C.indigo } } };
+    /* ── ROW 3: Year / Sem / Title ── */
+    const parts = [];
+    if (semester) parts.push(semester + ' SEM');
+    if (division) parts.push('Div: ' + division);
+    parts.push('AY: ' + new Date(fromDate+'T00:00:00').getFullYear() + '-' + (new Date(fromDate+'T00:00:00').getFullYear()+1));
+    parts.push('STUDENTS ' + typeLabel.toUpperCase() + ' ATTENDANCE SHEET');
+    ws.addRow([parts.join(',  ')]);
+    const r3 = ws.lastRow; r3.height = 17;
+    ws.mergeCells(`A3:${lastCL}3`);
+    Object.assign(r3.getCell(1), {
+      value: parts.join(',  '),
+      font:      { bold:true, size:10, color:{ argb: C.indigoDark } },
+      alignment: { horizontal:'center', vertical:'middle' },
     });
-    return r.number;
-  }
 
-  /* ── Zebra-stripe data row ── */
-  function styleDataRow(ws, rowNum, idx, ncols, overrides) {
-    const r = ws.getRow(rowNum);
-    const bg = idx % 2 === 0 ? C.offwhite : 'FFFFFF';
-    for (let i = 1; i <= ncols; i++) {
-      const cell = r.getCell(i);
-      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
-      cell.font      = i <= 3 ? { bold: i === 2, size: 9, color: { argb: C.text } }
-                               : { size: 9, color: { argb: C.text } };
-      cell.alignment = { horizontal: i <= 3 ? 'left' : 'center', vertical: 'middle' };
-    }
-    if (overrides) overrides(r);
-  }
-
-  /* ── Totals row ── */
-  function addTotalsRow(ws, values, ncols) {
+    /* ── ROW 4: Course Name | Course Code ── */
     ws.addRow([]);
-    ws.addRow(values);
-    const r = ws.lastRow; r.height = 20;
-    for (let i = 1; i <= ncols; i++) {
-      const cell = r.getCell(i);
-      cell.font   = { bold: true, size: 10, color: { argb: C.indigoDark } };
-      cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.indigoLight } };
-      cell.border = { top: { style: 'thin', color: { argb: C.indigo } } };
+    const r4 = ws.lastRow; r4.height = 17;
+    const mid = Math.max(nFixed, Math.floor(nTotal / 2));
+    ws.mergeCells(`A4:${CL(mid)}4`);
+    Object.assign(r4.getCell(1), {
+      value: `COURSE NAME:   ${courseName}`,
+      font:      { bold:true, size:9, color:{ argb: C.indigoDark } },
+      fill:      { type:'pattern', pattern:'solid', fgColor:{ argb: C.indigoLight } },
+      alignment: { horizontal:'left', vertical:'middle' },
+    });
+    ws.mergeCells(`${CL(mid+1)}4:${lastCL}4`);
+    Object.assign(r4.getCell(mid+1), {
+      value: `COURSE CODE:   ${courseCode}`,
+      font:      { bold:true, size:9, color:{ argb: C.indigoDark } },
+      fill:      { type:'pattern', pattern:'solid', fgColor:{ argb: C.tealLight } },
+      alignment: { horizontal:'left', vertical:'middle' },
+    });
+
+    /* ── ROW 5: Column headers ── */
+    const hdrVals = ['Sr.\nNo.', 'Enrollment\nNo.', 'Student Name', 'Department'];
+    sessions.forEach(s => hdrVals.push(fmtShort(s.sessionDate||s.createdAt.slice(0,10))));
+    hdrVals.push('Total\nPresent', 'Total\nAbsent', 'Total\nSessions', 'Att.\n%');
+
+    ws.addRow(hdrVals);
+    const r5 = ws.lastRow; r5.height = 64;
+    hdrVals.forEach((_, i) => {
+      const cell = r5.getCell(i+1);
+      const isDateCol = i >= nFixed && i < nFixed + nDates;
+      cell.font      = { bold:true, size:9, color:{ argb: C.white } };
+      cell.fill      = { type:'pattern', pattern:'solid', fgColor:{ argb: C.indigoDark } };
+      cell.alignment = {
+        horizontal : 'center', vertical: 'middle',
+        textRotation: isDateCol ? 90 : 0, wrapText: true,
+      };
+      cell.border = {
+        top   : { style:'thin',   color:{ argb: C.indigo } },
+        bottom: { style:'medium', color:{ argb: C.indigo } },
+        left  : { style:'thin',   color:{ argb: C.border } },
+        right : { style:'thin',   color:{ argb: C.border } },
+      };
+    });
+
+    /* Freeze: rows 1-5, first 4 columns */
+    ws.views = [{ state:'frozen', ySplit:5, xSplit: nFixed }];
+
+    /* ── DATA ROWS ── */
+    students.forEach((st, idx) => {
+      const k   = st.roll.toLowerCase();
+      const row = [idx+1, st.roll, st.name, st.classInfo.replace(/\[.*?\]/g,'').trim()];
+      let totalP = 0;
+      sessions.forEach(s => {
+        const p = !!(lookup[k] && lookup[k][s.id]);
+        row.push(p ? 'P' : 'A');
+        if (p) totalP++;
+      });
+      const totalA = sessions.length - totalP;
+      const pctNum = sessions.length > 0 ? (totalP/sessions.length)*100 : 0;
+      row.push(totalP, totalA, sessions.length, sessions.length > 0 ? pctNum.toFixed(1)+'%' : '—');
+
+      ws.addRow(row);
+      const r = ws.lastRow; r.height = 14;
+      const bg = idx % 2 === 0 ? C.offwhite : C.white;
+
+      /* Fixed columns */
+      for (let i=1; i<=nFixed; i++) {
+        const cell = r.getCell(i);
+        cell.fill      = { type:'pattern', pattern:'solid', fgColor:{ argb: bg } };
+        cell.font      = { size:9, bold: i===3, color:{ argb: C.text } };
+        cell.alignment = { horizontal: i===1?'center':'left', vertical:'middle' };
+        cell.border    = { right:{ style:'thin', color:{ argb: C.border } } };
+      }
+
+      /* P/A date columns */
+      sessions.forEach((s, si) => {
+        const ci   = nFixed + si + 1;
+        const cell = r.getCell(ci);
+        const pres = !!(lookup[k] && lookup[k][s.id]);
+        cell.value     = pres ? 'P' : 'A';
+        cell.font      = { bold:true, size:8, color:{ argb: pres ? C.green : C.red } };
+        cell.fill      = { type:'pattern', pattern:'solid', fgColor:{ argb: pres ? C.greenLight : C.redLight } };
+        cell.alignment = { horizontal:'center', vertical:'middle' };
+        cell.border    = { right:{ style:'thin', color:{ argb: C.border } } };
+      });
+
+      /* Summary columns */
+      const pctColor = pctNum >= 75 ? C.green : pctNum >= 50 ? C.amber : C.red;
+      [totalP, totalA, sessions.length, sessions.length>0?pctNum.toFixed(1)+'%':'—'].forEach((v, ii) => {
+        const ci   = nFixed + nDates + ii + 1;
+        const cell = r.getCell(ci);
+        cell.value     = v;
+        cell.fill      = { type:'pattern', pattern:'solid', fgColor:{ argb: bg } };
+        cell.font      = { bold: ii===3, size:9, color:{ argb: ii===3 ? pctColor : C.text } };
+        cell.alignment = { horizontal:'center', vertical:'middle' };
+        cell.border    = { left: ii===0 ? { style:'medium', color:{ argb: C.indigo } } : undefined, right:{ style:'thin', color:{ argb: C.border } } };
+      });
+    });
+
+    /* ── TOTALS ROW ── */
+    ws.addRow([]);
+    const totVals = ['', `Total Students: ${students.length}`, '', ''];
+    sessions.forEach(s => {
+      const cnt = students.filter(st => lookup[st.roll.toLowerCase()]?.[s.id]).length;
+      totVals.push(cnt);
+    });
+    const grandP = students.reduce((acc,st) =>
+      acc + sessions.filter(s => lookup[st.roll.toLowerCase()]?.[s.id]).length, 0);
+    const grandA = students.length * sessions.length - grandP;
+    const classAvg = students.length > 0 && sessions.length > 0
+      ? (grandP/(students.length*sessions.length)*100).toFixed(1)+'%' : '—';
+    totVals.push(grandP, grandA, sessions.length, classAvg);
+
+    ws.addRow(totVals);
+    const tR = ws.lastRow; tR.height = 18;
+    for (let i=1; i<=nTotal; i++) {
+      const cell = tR.getCell(i);
+      cell.font   = { bold:true, size:9, color:{ argb: C.indigoDark } };
+      cell.fill   = { type:'pattern', pattern:'solid', fgColor:{ argb: C.indigoLight } };
+      cell.alignment = { horizontal:'center', vertical:'middle' };
+      cell.border = { top:{ style:'medium', color:{ argb: C.indigo } } };
     }
+    tR.getCell(2).alignment = { horizontal:'left', vertical:'middle' };
   }
 
-  /* ════════════════════════════════
-     SHEET 1 — Theory Attendance
-  ════════════════════════════════ */
-  if (exportType === 'Both' || exportType === 'Theory') {
-    const ws1 = WB.addWorksheet('Theory Attendance');
-    ws1.columns = [
-      { width: 8 },  // Sr.No
-      { width: 28 }, // Name
-      { width: 18 }, // Enrollment
-      { width: 14 }, // Date
-      { width: 14 }, // Punch Time
-      { width: 10 }, // Present
-      { width: 16 }, // Att%
+  /* ════════════════════════════════════════════════════════
+     Summary sheet — per-student Theory% + Lab% + Overall%
+  ════════════════════════════════════════════════════════ */
+  function buildSummarySheet() {
+    const ws = WB.addWorksheet('Summary');
+    const nTotal = 10;
+    const lastCL = CL(nTotal);
+
+    ws.columns = [
+      { width:5 }, { width:16 }, { width:22 }, { width:16 },
+      { width:14 }, { width:14 }, { width:12 },
+      { width:12 }, { width:12 }, { width:12 },
     ];
-    addHeaderBlock(ws1, 'Theory Attendance', 'Theory Lectures', 7);
-    const hRow1 = addColHeaders(ws1, ['Sr.No', 'Student Name', 'Enrollment No', 'Date', 'Punch Time', 'Present', 'Attendance %']);
-    ws1.views = [{ state: 'frozen', ySplit: hRow1 }];
 
-    const theoryTotal = theorySessions.length;
-    let sr = 1, dataIdx = 0;
-    students.forEach(st => {
-      const pct = theoryTotal > 0 ? ((st.theoryPresent / theoryTotal) * 100).toFixed(1) + '%' : '0.0%';
-      const recs = (st.theoryRecords||[]).sort((a,b) => a.date.localeCompare(b.date));
-      if (recs.length > 0) {
-        recs.forEach((rec, idx) => {
-          ws1.addRow([
-            idx === 0 ? sr : '',
-            idx === 0 ? st.name : '',
-            idx === 0 ? st.roll : '',
-            fmtDate(rec.date),
-            new Date(rec.time).toLocaleTimeString('en-IN'),
-            'P',
-            idx === 0 ? pct : '',
-          ]);
-          styleDataRow(ws1, ws1.lastRow.number, dataIdx, 7, r => {
-            r.getCell(6).font = { bold: true, size: 9, color: { argb: C.green } };
-          });
-        });
-      } else {
-        ws1.addRow([sr, st.name, st.roll, '—', '—', 'Absent', pct]);
-        styleDataRow(ws1, ws1.lastRow.number, dataIdx, 7, r => {
-          r.getCell(6).font = { bold: true, size: 9, color: { argb: C.red } };
-        });
-      }
-      sr++; dataIdx++;
+    /* Header rows */
+    ['AttendX — Smart Attendance System', department||'Department',
+      `ATTENDANCE SUMMARY   |   ${fmtDate(fromDate)}  →  ${fmtDate(toDate)}`
+    ].forEach((txt, rowIdx) => {
+      ws.addRow([txt]);
+      const r = ws.lastRow; r.height = rowIdx===0 ? 26 : 18;
+      ws.mergeCells(`A${r.number}:${lastCL}${r.number}`);
+      Object.assign(r.getCell(1), {
+        value: txt,
+        font: { bold:true, size: rowIdx===0 ? 13 : 10, color:{ argb: C.indigoDark } },
+        alignment: { horizontal:'center', vertical:'middle' },
+      });
     });
 
-    const avgT = theoryTotal > 0 && students.length > 0
-      ? (students.reduce((a,s) => a + (s.theoryPresent/theoryTotal)*100, 0) / students.length).toFixed(1) + '%' : '0.0%';
-    addTotalsRow(ws1, ['', `Total Students: ${students.length}`, '', '', `Total Theory Sessions: ${theoryTotal}`, '', `Avg: ${avgT}`], 7);
+    /* Course row */
+    ws.addRow([]);
+    const r4 = ws.lastRow; r4.height = 17;
+    ws.mergeCells(`A4:E4`);
+    Object.assign(r4.getCell(1), {
+      value: `COURSE NAME:   ${courseName}`,
+      font: { bold:true, size:9, color:{ argb: C.indigoDark } },
+      fill: { type:'pattern', pattern:'solid', fgColor:{ argb: C.indigoLight } },
+      alignment: { horizontal:'left', vertical:'middle' },
+    });
+    ws.mergeCells(`F4:J4`);
+    Object.assign(r4.getCell(6), {
+      value: `COURSE CODE:   ${courseCode}`,
+      font: { bold:true, size:9, color:{ argb: C.indigoDark } },
+      fill: { type:'pattern', pattern:'solid', fgColor:{ argb: C.tealLight } },
+      alignment: { horizontal:'left', vertical:'middle' },
+    });
+
+    /* Column headers */
+    ws.addRow(['Sr.\nNo.', 'Enrollment No.', 'Student Name', 'Department',
+      'Theory\nSessions', 'Theory\nPresent', 'Theory\n%',
+      'Lab\nSessions', 'Lab\nPresent', 'Lab / Overall %']);
+    const r5 = ws.lastRow; r5.height = 40;
+    for (let i=1; i<=nTotal; i++) {
+      const cell = r5.getCell(i);
+      cell.font      = { bold:true, size:9, color:{ argb: C.white } };
+      cell.fill      = { type:'pattern', pattern:'solid', fgColor:{ argb: C.indigoDark } };
+      cell.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+      cell.border    = { bottom:{ style:'medium', color:{ argb: C.indigo } }, right:{ style:'thin', color:{ argb: C.border } } };
+    }
+    ws.views = [{ state:'frozen', ySplit:5, xSplit:3 }];
+
+    const tT = theorySessions.length, tL = labSessions.length;
+    students.forEach((st, idx) => {
+      const k  = st.roll.toLowerCase();
+      const tP = theorySessions.filter(s => lookup[k]?.[s.id]).length;
+      const lP = labSessions.filter(s => lookup[k]?.[s.id]).length;
+      const tPct = tT > 0 ? (tP/tT*100).toFixed(1)+'%' : '—';
+      const lPct = tL > 0 ? (lP/tL*100).toFixed(1)+'%' : '—';
+      const totS = tT + tL, totP = tP + lP;
+      const oPct = totS > 0 ? (totP/totS*100).toFixed(1)+'%' : '—';
+      const oPctNum = totS > 0 ? totP/totS*100 : null;
+      const pctColor = oPctNum === null ? C.muted : oPctNum >= 75 ? C.green : oPctNum >= 50 ? C.amber : C.red;
+
+      ws.addRow([idx+1, st.roll, st.name, st.classInfo.replace(/\[.*?\]/g,'').trim(),
+        tT, tP, tPct, tL, lP, oPct]);
+      const r = ws.lastRow; r.height = 14;
+      const bg = idx % 2 === 0 ? C.offwhite : C.white;
+      for (let i=1; i<=nTotal; i++) {
+        const cell = r.getCell(i);
+        cell.fill      = { type:'pattern', pattern:'solid', fgColor:{ argb: bg } };
+        cell.font      = { size:9, bold: i===3, color:{ argb: i===10 ? pctColor : C.text } };
+        cell.alignment = { horizontal: i<=1||i>=5?'center':'left', vertical:'middle' };
+        cell.border    = { right:{ style:'thin', color:{ argb: C.border } } };
+      }
+      if (i >= 7) r.getCell(10).font = { bold:true, size:9, color:{ argb: pctColor } };
+    });
+
+    /* Totals */
+    ws.addRow([]);
+    const avgT = tT>0&&students.length>0 ? (students.reduce((a,st)=>a+theorySessions.filter(s=>lookup[st.roll.toLowerCase()]?.[s.id]).length,0)/(students.length*tT)*100).toFixed(1)+'%' : '—';
+    const avgL = tL>0&&students.length>0 ? (students.reduce((a,st)=>a+labSessions.filter(s=>lookup[st.roll.toLowerCase()]?.[s.id]).length,0)/(students.length*tL)*100).toFixed(1)+'%' : '—';
+    const avgO = (tT+tL)>0&&students.length>0 ? (students.reduce((a,st)=>a+[...theorySessions,...labSessions].filter(s=>lookup[st.roll.toLowerCase()]?.[s.id]).length,0)/(students.length*(tT+tL))*100).toFixed(1)+'%' : '—';
+    ws.addRow(['', `Total Students: ${students.length}`, '', '', tT, '', `Avg: ${avgT}`, tL, '', `Avg: ${avgO}`]);
+    const tR = ws.lastRow; tR.height = 18;
+    for (let i=1; i<=nTotal; i++) {
+      const cell = tR.getCell(i);
+      cell.font   = { bold:true, size:9, color:{ argb: C.indigoDark } };
+      cell.fill   = { type:'pattern', pattern:'solid', fgColor:{ argb: C.indigoLight } };
+      cell.alignment = { horizontal:'center', vertical:'middle' };
+      cell.border = { top:{ style:'medium', color:{ argb: C.indigo } } };
+    }
+    tR.getCell(2).alignment = { horizontal:'left', vertical:'middle' };
   }
 
-  /* ════════════════════════════════
-     SHEET 2 — Laboratory Attendance
-  ════════════════════════════════ */
-  if (exportType === 'Both' || exportType === 'Lab') {
-    const ws2 = WB.addWorksheet('Laboratory Attendance');
-    ws2.columns = [
-      { width: 8 }, { width: 28 }, { width: 18 },
-      { width: 14 }, { width: 14 }, { width: 10 }, { width: 16 },
-    ];
-    addHeaderBlock(ws2, 'Laboratory Attendance', 'Lab Sessions', 7);
-    const hRow2 = addColHeaders(ws2, ['Sr.No', 'Student Name', 'Enrollment No', 'Date', 'Punch Time', 'Present', 'Attendance %']);
-    ws2.views = [{ state: 'frozen', ySplit: hRow2 }];
+  /* ── Build sheets ── */
+  if (exportType === 'Both' || exportType === 'Theory') buildMatrixSheet('Theory Attendance', theorySessions, 'Theory');
+  if (exportType === 'Both' || exportType === 'Lab')    buildMatrixSheet('Laboratory Attendance', labSessions, 'Lab');
+  buildSummarySheet();
 
-    const labTotal = labSessions.length;
-    let sr = 1, dataIdx = 0;
-    students.forEach(st => {
-      const pct = labTotal > 0 ? ((st.labPresent / labTotal) * 100).toFixed(1) + '%' : '0.0%';
-      const recs = (st.labRecords||[]).sort((a,b) => a.date.localeCompare(b.date));
-      if (recs.length > 0) {
-        recs.forEach((rec, idx) => {
-          ws2.addRow([
-            idx === 0 ? sr : '',
-            idx === 0 ? st.name : '',
-            idx === 0 ? st.roll : '',
-            fmtDate(rec.date),
-            new Date(rec.time).toLocaleTimeString('en-IN'),
-            'P',
-            idx === 0 ? pct : '',
-          ]);
-          styleDataRow(ws2, ws2.lastRow.number, dataIdx, 7, r => {
-            r.getCell(6).font = { bold: true, size: 9, color: { argb: C.green } };
-          });
-        });
-      } else {
-        ws2.addRow([sr, st.name, st.roll, '—', '—', 'Absent', pct]);
-        styleDataRow(ws2, ws2.lastRow.number, dataIdx, 7, r => {
-          r.getCell(6).font = { bold: true, size: 9, color: { argb: C.red } };
-        });
-      }
-      sr++; dataIdx++;
-    });
-
-    const avgL = labTotal > 0 && students.length > 0
-      ? (students.reduce((a,s) => a + (s.labPresent/labTotal)*100, 0) / students.length).toFixed(1) + '%' : '0.0%';
-    addTotalsRow(ws2, ['', `Total Students: ${students.length}`, '', '', `Total Lab Sessions: ${labTotal}`, '', `Avg: ${avgL}`], 7);
-  }
-
-  /* ════════════════════════════════
-     SHEET 3 — Summary
-  ════════════════════════════════ */
-  const ws3 = WB.addWorksheet('Summary');
-  ws3.columns = [
-    { width: 8 }, { width: 26 }, { width: 18 },
-    { width: 16 }, { width: 16 }, { width: 12 },
-    { width: 14 }, { width: 12 }, { width: 12 }, { width: 12 },
-  ];
-  addHeaderBlock(ws3, 'Attendance Summary', exportType === 'Both' ? 'Theory + Lab' : exportType, 10);
-  const hRow3 = addColHeaders(ws3, [
-    'Sr.No', 'Student Name', 'Enrollment No',
-    'Theory Sessions', 'Theory Present', 'Theory %',
-    'Lab Sessions', 'Lab Present', 'Lab %', 'Overall %'
-  ]);
-  ws3.views = [{ state: 'frozen', ySplit: hRow3 }];
-
-  const theoryTotal = theorySessions.length;
-  const labTotal    = labSessions.length;
-
-  students.forEach((st, i) => {
-    const tPct  = theoryTotal > 0 ? ((st.theoryPresent/theoryTotal)*100).toFixed(1)+'%' : '—';
-    const lPct  = labTotal    > 0 ? ((st.labPresent/labTotal)*100).toFixed(1)+'%'       : '—';
-    const totalS = theoryTotal + labTotal;
-    const totalP = st.theoryPresent + st.labPresent;
-    const oPct   = totalS > 0 ? ((totalP/totalS)*100).toFixed(1)+'%' : '—';
-    const oPctNum = totalS > 0 ? (totalP/totalS)*100 : null;
-    const pctColor = oPctNum === null ? C.muted : oPctNum >= 75 ? C.green : oPctNum >= 50 ? C.amber : C.red;
-
-    ws3.addRow([i+1, st.name, st.roll, theoryTotal, st.theoryPresent, tPct, labTotal, st.labPresent, lPct, oPct]);
-    styleDataRow(ws3, ws3.lastRow.number, i, 10, r => {
-      r.getCell(10).font = { bold: true, size: 9, color: { argb: pctColor } };
-      r.getCell(6).font  = { bold: true, size: 9, color: { argb: C.indigo } };
-      r.getCell(9).font  = { bold: true, size: 9, color: { argb: C.cyan } };
-    });
-  });
-
-  const avgT = theoryTotal > 0 && students.length > 0
-    ? (students.reduce((a,s) => a+s.theoryPresent, 0)/(students.length*theoryTotal)*100).toFixed(1)+'%' : '—';
-  const avgL = labTotal > 0 && students.length > 0
-    ? (students.reduce((a,s) => a+s.labPresent, 0)/(students.length*labTotal)*100).toFixed(1)+'%' : '—';
-  const avgO = (theoryTotal+labTotal) > 0 && students.length > 0
-    ? (students.reduce((a,s) => a+s.theoryPresent+s.labPresent, 0)/(students.length*(theoryTotal+labTotal))*100).toFixed(1)+'%' : '—';
-
-  addTotalsRow(ws3, [
-    '', `Total Students: ${students.length}`, '',
-    theoryTotal, '', `Avg Theory: ${avgT}`,
-    labTotal, '', `Avg Lab: ${avgL}`, `Avg: ${avgO}`
-  ], 10);
-
-  // ── Download ──
-  const subLabel   = (subjectFilter === 'ALL' ? 'All_Subjects' : subjectFilter.slice(0,20)).replace(/[^a-zA-Z0-9_]/g,'_');
-  const monthLabel = new Date(fromDate).toLocaleDateString('en-IN', { month:'long', year:'numeric' }).replace(' ','');
+  /* ── Download ── */
+  const subLabel   = (subjectFilter==='ALL'?'All_Subjects':subjectFilter.slice(0,20)).replace(/[^a-zA-Z0-9_]/g,'_');
+  const monthLabel = new Date(fromDate+'T00:00:00').toLocaleDateString('en-IN',{ month:'long', year:'numeric' }).replace(' ','');
   const filename   = `Attendance_${subLabel}_${monthLabel}.xlsx`.replace(/\s/g,'_');
 
   const buffer = await WB.xlsx.writeBuffer();
-  const blob   = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const blob   = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url    = URL.createObjectURL(blob);
   const a      = document.createElement('a');
   a.href = url; a.download = filename;
