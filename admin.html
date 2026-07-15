@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1693,21 +1693,34 @@ async function exportExcelAdvanced(filtered, fromDate, toDate, subjectFilter, se
   const theorySessions = sortByDate(filtered.filter(s => (s.sessionType||'').toLowerCase() !== 'laboratory'));
   const labSessions    = sortByDate(filtered.filter(s => (s.sessionType||'').toLowerCase() === 'laboratory'));
 
+  /* ── Deduplicate sessions by ID (prevent double-counting) ── */
+  const seenIds = new Set();
+  const dedupFiltered = filtered.filter(s => { if (seenIds.has(s.id)) return false; seenIds.add(s.id); return true; });
+
+  /* ── Normalise roll: trim, collapse spaces, lowercase ── */
+  const normRoll = r => (r||'').trim().replace(/\s+/g,'').toLowerCase();
+
   /* ── Build student list & attendance lookup ── */
   const studentMap = {};
-  filtered.forEach(s => (s.attendance||[]).forEach(a => {
-    const k = a.roll.toLowerCase();
-    if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, classInfo: s.class||'' };
+  dedupFiltered.forEach(s => (s.attendance||[]).forEach(a => {
+    const k = normRoll(a.roll);
+    if (!k) return;
+    if (!studentMap[k]) studentMap[k] = { name: a.name, roll: (a.roll||'').trim(), classInfo: s.class||'' };
   }));
   const students = Object.values(studentMap).sort((a,b) => a.roll.localeCompare(b.roll));
 
-  /* lookup[studentKey][sessionId] = true */
+  /* lookup[normalisedRoll][sessionId] = true */
   const lookup = {};
-  filtered.forEach(s => (s.attendance||[]).forEach(a => {
-    const k = a.roll.toLowerCase();
+  dedupFiltered.forEach(s => (s.attendance||[]).forEach(a => {
+    const k = normRoll(a.roll);
+    if (!k) return;
     if (!lookup[k]) lookup[k] = {};
     lookup[k][s.id] = true;
   }));
+
+  /* ── Replace filtered with deduped version for all downstream use ── */
+  filtered = dedupFiltered;
+
 
   /* ── Extract course info from session data ── */
   const first        = filtered[0] || {};
@@ -1817,7 +1830,7 @@ async function exportExcelAdvanced(filtered, fromDate, toDate, subjectFilter, se
 
     /* ── DATA ROWS ── */
     students.forEach((st, idx) => {
-      const k   = st.roll.toLowerCase();
+      const k = normRoll(st.roll);
       const row = [idx+1, st.roll, st.name, st.classInfo.replace(/\[.*?\]/g,'').trim()];
       let totalP = 0;
       sessions.forEach(s => {
@@ -1871,11 +1884,11 @@ async function exportExcelAdvanced(filtered, fromDate, toDate, subjectFilter, se
     ws.addRow([]);
     const totVals = ['', `Total Students: ${students.length}`, '', ''];
     sessions.forEach(s => {
-      const cnt = students.filter(st => lookup[st.roll.toLowerCase()]?.[s.id]).length;
+      const cnt = students.filter(st => lookup[normRoll(st.roll)]?.[s.id]).length;
       totVals.push(cnt);
     });
     const grandP = students.reduce((acc,st) =>
-      acc + sessions.filter(s => lookup[st.roll.toLowerCase()]?.[s.id]).length, 0);
+      acc + sessions.filter(s => lookup[normRoll(st.roll)]?.[s.id]).length, 0);
     const grandA = students.length * sessions.length - grandP;
     const classAvg = students.length > 0 && sessions.length > 0
       ? (grandP/(students.length*sessions.length)*100).toFixed(1)+'%' : '—';
@@ -1955,7 +1968,7 @@ async function exportExcelAdvanced(filtered, fromDate, toDate, subjectFilter, se
 
     const tT = theorySessions.length, tL = labSessions.length;
     students.forEach((st, idx) => {
-      const k  = st.roll.toLowerCase();
+      const k = normRoll(st.roll);
       const tP = theorySessions.filter(s => lookup[k]?.[s.id]).length;
       const lP = labSessions.filter(s => lookup[k]?.[s.id]).length;
       const tPct = tT > 0 ? (tP/tT*100).toFixed(1)+'%' : '—';
@@ -1980,9 +1993,9 @@ async function exportExcelAdvanced(filtered, fromDate, toDate, subjectFilter, se
 
     /* Totals */
     ws.addRow([]);
-    const avgT = tT>0&&students.length>0 ? (students.reduce((a,st)=>a+theorySessions.filter(s=>lookup[st.roll.toLowerCase()]?.[s.id]).length,0)/(students.length*tT)*100).toFixed(1)+'%' : '—';
-    const avgL = tL>0&&students.length>0 ? (students.reduce((a,st)=>a+labSessions.filter(s=>lookup[st.roll.toLowerCase()]?.[s.id]).length,0)/(students.length*tL)*100).toFixed(1)+'%' : '—';
-    const avgO = (tT+tL)>0&&students.length>0 ? (students.reduce((a,st)=>a+[...theorySessions,...labSessions].filter(s=>lookup[st.roll.toLowerCase()]?.[s.id]).length,0)/(students.length*(tT+tL))*100).toFixed(1)+'%' : '—';
+    const avgT = tT>0&&students.length>0 ? (students.reduce((a,st)=>a+theorySessions.filter(s=>lookup[normRoll(st.roll)]?.[s.id]).length,0)/(students.length*tT)*100).toFixed(1)+'%' : '—';
+    const avgL = tL>0&&students.length>0 ? (students.reduce((a,st)=>a+labSessions.filter(s=>lookup[normRoll(st.roll)]?.[s.id]).length,0)/(students.length*tL)*100).toFixed(1)+'%' : '—';
+    const avgO = (tT+tL)>0&&students.length>0 ? (students.reduce((a,st)=>a+[...theorySessions,...labSessions].filter(s=>lookup[normRoll(st.roll)]?.[s.id]).length,0)/(students.length*(tT+tL))*100).toFixed(1)+'%' : '—';
     ws.addRow(['', `Total Students: ${students.length}`, '', '', tT, '', `Avg: ${avgT}`, tL, '', `Avg: ${avgO}`]);
     const tR = ws.lastRow; tR.height = 18;
     for (let i=1; i<=nTotal; i++) {
@@ -2147,3 +2160,4 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
