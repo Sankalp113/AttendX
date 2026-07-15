@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1400,20 +1401,20 @@ function selectRadio(groupId, clickedLabel) {
   clickedLabel.classList.add('selected');
 }
 
-function runExportAdvanced() {
-  const fromDate  = document.getElementById('exp-from-date').value;
-  const toDate    = document.getElementById('exp-to-date').value;
-  const subject   = document.getElementById('exp-subject').value;
-  const semester  = document.getElementById('exp-semester').value.trim();
-  const division  = document.getElementById('exp-division').value.trim();
-  const alertEl   = document.getElementById('export-modal-alert');
-  const typeRadio = document.querySelector('input[name="exp-type"]:checked') || document.querySelector('#exp-type-group .radio-option.selected input');
+async function runExportAdvanced() {
+  const fromDate   = document.getElementById('exp-from-date').value;
+  const toDate     = document.getElementById('exp-to-date').value;
+  const subject    = document.getElementById('exp-subject').value;
+  const semester   = document.getElementById('exp-semester').value.trim();
+  const division   = document.getElementById('exp-division').value.trim();
+  const alertEl    = document.getElementById('export-modal-alert');
+  const typeRadio  = document.querySelector('input[name="exp-type"]:checked') ||
+                     document.querySelector('#exp-type-group .radio-option.selected input');
   const exportType = typeRadio ? typeRadio.value : 'Both';
 
   if (!fromDate || !toDate) { showAlert(alertEl, 'error', '❌ Please select both From and To dates.'); return; }
   if (fromDate > toDate)    { showAlert(alertEl, 'error', '❌ From Date must be before To Date.');     return; }
 
-  // Filter sessions by date range and subject
   let filtered = sessions.filter(s => {
     const d = (s.sessionDate || s.createdAt.slice(0,10));
     return d >= fromDate && d <= toDate;
@@ -1425,192 +1426,321 @@ function runExportAdvanced() {
     return;
   }
 
+  const btn = document.getElementById('btn-run-export');
+  btn.textContent = '⏳ Generating…';
+  btn.disabled = true;
   hideAlert(alertEl);
-  exportExcelAdvanced(filtered, fromDate, toDate, subject, semester, division, exportType);
-  closeExportModal();
+
+  try {
+    await exportExcelAdvanced(filtered, fromDate, toDate, subject, semester, division, exportType);
+    closeExportModal();
+  } catch(e) {
+    showAlert(alertEl, 'error', '❌ Export failed: ' + e.message);
+  } finally {
+    btn.textContent = '📥 Export to Excel (.xlsx)';
+    btn.disabled = false;
+  }
 }
 
-/* ─── Multi-sheet Excel Export ─── */
-function exportExcelAdvanced(filtered, fromDate, toDate, subjectFilter, semester, division, exportType) {
-  const wb = XLSX.utils.book_new();
-  const exportedAt = new Date().toLocaleString('en-IN');
-  const dateRangeLabel = `${fmtDate(fromDate)} to ${fmtDate(toDate)}`;
-  const instituteName = 'AttendX — Smart Attendance System';
+/* ─── Multi-sheet Excel Export — ExcelJS (full styling) ─── */
+async function exportExcelAdvanced(filtered, fromDate, toDate, subjectFilter, semester, division, exportType) {
+  const WB = new ExcelJS.Workbook();
+  WB.creator  = 'AttendX';
+  WB.created  = new Date();
 
-  const theorySessions = filtered.filter(s => (s.sessionType || '').toLowerCase() !== 'laboratory');
-  const labSessions    = filtered.filter(s => (s.sessionType || '').toLowerCase() === 'laboratory');
+  // ── Color palette (6-char ARGB without alpha) ──
+  const C = {
+    indigo:      '6366F1',
+    indigoDark:  '1E2139',
+    indigoLight: 'EEF2FF',
+    cyan:        '06B6D4',
+    green:       '10B981',
+    amber:       'F59E0B',
+    red:         'EF4444',
+    white:       'FFFFFFFF',
+    offwhite:    'F8FAFC',
+    text:        '1E293B',
+    muted:       '64748B',
+  };
 
-  // Build per-student attendance maps
+  const theorySessions = filtered.filter(s => (s.sessionType||'').toLowerCase() !== 'laboratory');
+  const labSessions    = filtered.filter(s => (s.sessionType||'').toLowerCase() === 'laboratory');
+
+  // ── Build student map ──
   const studentMap = {};
-
-  theorySessions.forEach(s => {
-    (s.attendance || []).forEach(a => {
-      const k = a.roll.toLowerCase();
-      if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, theoryPresent: 0, labPresent: 0, theoryRecords: [], labRecords: [] };
-      studentMap[k].theoryPresent++;
-      studentMap[k].theoryRecords.push({ date: s.sessionDate || s.createdAt.slice(0,10), time: a.time, subject: s.subject });
-    });
-  });
-  labSessions.forEach(s => {
-    (s.attendance || []).forEach(a => {
-      const k = a.roll.toLowerCase();
-      if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, theoryPresent: 0, labPresent: 0, theoryRecords: [], labRecords: [] };
-      studentMap[k].labPresent++;
-      studentMap[k].labRecords.push({ date: s.sessionDate || s.createdAt.slice(0,10), time: a.time, subject: s.subject });
-    });
-  });
-
-  // Also ensure students who attended no sessions of a type are included if they attended any session
-  filtered.forEach(s => {
-    (s.attendance || []).forEach(a => {
-      const k = a.roll.toLowerCase();
-      if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, theoryPresent: 0, labPresent: 0, theoryRecords: [], labRecords: [] };
-    });
-  });
-
+  const addStudent = (a, k) => {
+    if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, theoryPresent: 0, labPresent: 0, theoryRecords: [], labRecords: [] };
+  };
+  theorySessions.forEach(s => (s.attendance||[]).forEach(a => {
+    const k = a.roll.toLowerCase(); addStudent(a, k);
+    studentMap[k].theoryPresent++;
+    studentMap[k].theoryRecords.push({ date: s.sessionDate||s.createdAt.slice(0,10), time: a.time });
+  }));
+  labSessions.forEach(s => (s.attendance||[]).forEach(a => {
+    const k = a.roll.toLowerCase(); addStudent(a, k);
+    studentMap[k].labPresent++;
+    studentMap[k].labRecords.push({ date: s.sessionDate||s.createdAt.slice(0,10), time: a.time });
+  }));
+  filtered.forEach(s => (s.attendance||[]).forEach(a => addStudent(a, a.roll.toLowerCase())));
   const students = Object.values(studentMap).sort((a, b) => a.roll.localeCompare(b.roll));
 
-  /* ─ Header block builder ─ */
-  function buildHeader(sheetTitle, typeLabel) {
-    const rows = [
-      [instituteName],
-      ['Sheet:', sheetTitle],
-      ['Date Range:', dateRangeLabel],
-      ['Subject:', subjectFilter === 'ALL' ? 'All Subjects' : subjectFilter],
-      ['Type:', typeLabel],
-      ...(semester ? [['Semester:', semester]] : []),
-      ...(division ? [['Division:', division]] : []),
-      ['Exported:', exportedAt],
-      [],
+  const dateRangeLabel = `${fmtDate(fromDate)}  →  ${fmtDate(toDate)}`;
+  const exportedAt     = new Date().toLocaleString('en-IN');
+
+  /* ── Add institute header block to a worksheet ── */
+  function addHeaderBlock(ws, sheetTitle, typeLabel, ncols) {
+    const merge = n => `A${n}:${String.fromCharCode(64 + ncols)}${n}`;
+
+    // Banner row
+    ws.addRow(['AttendX — Smart Attendance System']);
+    const r1 = ws.lastRow; r1.height = 30;
+    ws.mergeCells(merge(r1.number));
+    const c1 = r1.getCell(1);
+    c1.value = 'AttendX — Smart Attendance System';
+    c1.font      = { bold: true, size: 14, color: { argb: C.white } };
+    c1.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.indigo } };
+    c1.alignment = { horizontal: 'left', vertical: 'middle' };
+
+    // Subtitle
+    ws.addRow([sheetTitle]);
+    const r2 = ws.lastRow; r2.height = 20;
+    ws.mergeCells(merge(r2.number));
+    const c2 = r2.getCell(1);
+    c2.value = sheetTitle;
+    c2.font      = { bold: true, size: 10, color: { argb: C.white } };
+    c2.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.indigoDark } };
+    c2.alignment = { horizontal: 'left', vertical: 'middle' };
+
+    // Info rows
+    const info = [
+      ['Date Range', dateRangeLabel],
+      ['Subject',    subjectFilter === 'ALL' ? 'All Subjects' : subjectFilter],
+      ['Type',       typeLabel],
     ];
-    return rows;
+    if (semester) info.push(['Semester', semester]);
+    if (division) info.push(['Division', division]);
+    info.push(['Exported', exportedAt]);
+
+    info.forEach(([lbl, val]) => {
+      ws.addRow([lbl, val]);
+      const r = ws.lastRow; r.height = 16;
+      // merge value cells
+      if (ncols > 2) ws.mergeCells(`B${r.number}:${String.fromCharCode(64+ncols)}${r.number}`);
+      const cL = r.getCell(1);
+      cL.font = { bold: true, size: 9, color: { argb: C.indigo } };
+      cL.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.indigoLight } };
+      cL.alignment = { horizontal: 'left', vertical: 'middle' };
+      const cV = r.getCell(2);
+      cV.font = { size: 9, color: { argb: C.text } };
+      cV.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.indigoLight } };
+      cV.alignment = { horizontal: 'left', vertical: 'middle' };
+    });
+    ws.addRow([]); // spacer
   }
 
-  /* ─ Sheet 1: Theory Attendance ─ */
+  /* ── Column header row ── */
+  function addColHeaders(ws, cols) {
+    ws.addRow(cols);
+    const r = ws.lastRow; r.height = 24;
+    cols.forEach((_, i) => {
+      const cell = r.getCell(i + 1);
+      cell.font      = { bold: true, size: 10, color: { argb: C.white } };
+      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.indigoDark } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border    = { bottom: { style: 'medium', color: { argb: C.indigo } } };
+    });
+    return r.number;
+  }
+
+  /* ── Zebra-stripe data row ── */
+  function styleDataRow(ws, rowNum, idx, ncols, overrides) {
+    const r = ws.getRow(rowNum);
+    const bg = idx % 2 === 0 ? C.offwhite : 'FFFFFF';
+    for (let i = 1; i <= ncols; i++) {
+      const cell = r.getCell(i);
+      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.font      = i <= 3 ? { bold: i === 2, size: 9, color: { argb: C.text } }
+                               : { size: 9, color: { argb: C.text } };
+      cell.alignment = { horizontal: i <= 3 ? 'left' : 'center', vertical: 'middle' };
+    }
+    if (overrides) overrides(r);
+  }
+
+  /* ── Totals row ── */
+  function addTotalsRow(ws, values, ncols) {
+    ws.addRow([]);
+    ws.addRow(values);
+    const r = ws.lastRow; r.height = 20;
+    for (let i = 1; i <= ncols; i++) {
+      const cell = r.getCell(i);
+      cell.font   = { bold: true, size: 10, color: { argb: C.indigoDark } };
+      cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.indigoLight } };
+      cell.border = { top: { style: 'thin', color: { argb: C.indigo } } };
+    }
+  }
+
+  /* ════════════════════════════════
+     SHEET 1 — Theory Attendance
+  ════════════════════════════════ */
   if (exportType === 'Both' || exportType === 'Theory') {
-    const headerRows = buildHeader('Theory Attendance', 'Theory Lectures');
-    headerRows.push(['Sr.No', 'Student Name', 'Enrollment No', 'Date', 'Punch Time', 'Present', 'Attendance %']);
+    const ws1 = WB.addWorksheet('Theory Attendance');
+    ws1.columns = [
+      { width: 8 },  // Sr.No
+      { width: 28 }, // Name
+      { width: 18 }, // Enrollment
+      { width: 14 }, // Date
+      { width: 14 }, // Punch Time
+      { width: 10 }, // Present
+      { width: 16 }, // Att%
+    ];
+    addHeaderBlock(ws1, 'Theory Attendance', 'Theory Lectures', 7);
+    const hRow1 = addColHeaders(ws1, ['Sr.No', 'Student Name', 'Enrollment No', 'Date', 'Punch Time', 'Present', 'Attendance %']);
+    ws1.views = [{ state: 'frozen', ySplit: hRow1 }];
 
-    // For each student list all theory sessions with their punch times
-    let sr = 1;
     const theoryTotal = theorySessions.length;
-
+    let sr = 1, dataIdx = 0;
     students.forEach(st => {
       const pct = theoryTotal > 0 ? ((st.theoryPresent / theoryTotal) * 100).toFixed(1) + '%' : '0.0%';
-      if (st.theoryRecords.length > 0) {
-        st.theoryRecords.sort((a, b) => a.date.localeCompare(b.date)).forEach((rec, idx) => {
-          headerRows.push([
+      const recs = (st.theoryRecords||[]).sort((a,b) => a.date.localeCompare(b.date));
+      if (recs.length > 0) {
+        recs.forEach((rec, idx) => {
+          ws1.addRow([
             idx === 0 ? sr : '',
             idx === 0 ? st.name : '',
             idx === 0 ? st.roll : '',
             fmtDate(rec.date),
             new Date(rec.time).toLocaleTimeString('en-IN'),
             'P',
-            idx === 0 ? pct : ''
+            idx === 0 ? pct : '',
           ]);
+          styleDataRow(ws1, ws1.lastRow.number, dataIdx, 7, r => {
+            r.getCell(6).font = { bold: true, size: 9, color: { argb: C.green } };
+          });
         });
       } else {
-        headerRows.push([sr, st.name, st.roll, '—', '—', 'Absent', pct]);
+        ws1.addRow([sr, st.name, st.roll, '—', '—', 'Absent', pct]);
+        styleDataRow(ws1, ws1.lastRow.number, dataIdx, 7, r => {
+          r.getCell(6).font = { bold: true, size: 9, color: { argb: C.red } };
+        });
       }
-      sr++;
+      sr++; dataIdx++;
     });
 
-    // Totals
-    headerRows.push([]);
-    const avgTheoryPct = theoryTotal > 0 && students.length > 0
-      ? (students.reduce((acc, st) => acc + (theoryTotal > 0 ? (st.theoryPresent / theoryTotal) * 100 : 0), 0) / students.length).toFixed(1) + '%'
-      : '0.0%';
-    headerRows.push(['', 'Total Students:', students.length, '', 'Total Theory Sessions:', theoryTotal, 'Avg Class Attendance: ' + avgTheoryPct]);
-
-    const ws1 = XLSX.utils.aoa_to_sheet(headerRows);
-    ws1['!cols'] = [8, 28, 18, 14, 14, 10, 16].map(w => ({ wch: w }));
-    ws1['!freeze'] = { xSplit: 0, ySplit: headerRows.length - students.length - 3 };
-    XLSX.utils.book_append_sheet(wb, ws1, 'Theory Attendance');
+    const avgT = theoryTotal > 0 && students.length > 0
+      ? (students.reduce((a,s) => a + (s.theoryPresent/theoryTotal)*100, 0) / students.length).toFixed(1) + '%' : '0.0%';
+    addTotalsRow(ws1, ['', `Total Students: ${students.length}`, '', '', `Total Theory Sessions: ${theoryTotal}`, '', `Avg: ${avgT}`], 7);
   }
 
-  /* ─ Sheet 2: Laboratory Attendance ─ */
+  /* ════════════════════════════════
+     SHEET 2 — Laboratory Attendance
+  ════════════════════════════════ */
   if (exportType === 'Both' || exportType === 'Lab') {
-    const headerRows = buildHeader('Laboratory Attendance', 'Lab Sessions');
-    headerRows.push(['Sr.No', 'Student Name', 'Enrollment No', 'Date', 'Punch Time', 'Present', 'Attendance %']);
+    const ws2 = WB.addWorksheet('Laboratory Attendance');
+    ws2.columns = [
+      { width: 8 }, { width: 28 }, { width: 18 },
+      { width: 14 }, { width: 14 }, { width: 10 }, { width: 16 },
+    ];
+    addHeaderBlock(ws2, 'Laboratory Attendance', 'Lab Sessions', 7);
+    const hRow2 = addColHeaders(ws2, ['Sr.No', 'Student Name', 'Enrollment No', 'Date', 'Punch Time', 'Present', 'Attendance %']);
+    ws2.views = [{ state: 'frozen', ySplit: hRow2 }];
 
-    let sr = 1;
     const labTotal = labSessions.length;
-
+    let sr = 1, dataIdx = 0;
     students.forEach(st => {
       const pct = labTotal > 0 ? ((st.labPresent / labTotal) * 100).toFixed(1) + '%' : '0.0%';
-      if (st.labRecords.length > 0) {
-        st.labRecords.sort((a, b) => a.date.localeCompare(b.date)).forEach((rec, idx) => {
-          headerRows.push([
+      const recs = (st.labRecords||[]).sort((a,b) => a.date.localeCompare(b.date));
+      if (recs.length > 0) {
+        recs.forEach((rec, idx) => {
+          ws2.addRow([
             idx === 0 ? sr : '',
             idx === 0 ? st.name : '',
             idx === 0 ? st.roll : '',
             fmtDate(rec.date),
             new Date(rec.time).toLocaleTimeString('en-IN'),
             'P',
-            idx === 0 ? pct : ''
+            idx === 0 ? pct : '',
           ]);
+          styleDataRow(ws2, ws2.lastRow.number, dataIdx, 7, r => {
+            r.getCell(6).font = { bold: true, size: 9, color: { argb: C.green } };
+          });
         });
       } else {
-        headerRows.push([sr, st.name, st.roll, '—', '—', 'Absent', pct]);
+        ws2.addRow([sr, st.name, st.roll, '—', '—', 'Absent', pct]);
+        styleDataRow(ws2, ws2.lastRow.number, dataIdx, 7, r => {
+          r.getCell(6).font = { bold: true, size: 9, color: { argb: C.red } };
+        });
       }
-      sr++;
+      sr++; dataIdx++;
     });
 
-    headerRows.push([]);
-    const avgLabPct = labTotal > 0 && students.length > 0
-      ? (students.reduce((acc, st) => acc + (labTotal > 0 ? (st.labPresent / labTotal) * 100 : 0), 0) / students.length).toFixed(1) + '%'
-      : '0.0%';
-    headerRows.push(['', 'Total Students:', students.length, '', 'Total Lab Sessions:', labTotal, 'Avg Class Attendance: ' + avgLabPct]);
-
-    const ws2 = XLSX.utils.aoa_to_sheet(headerRows);
-    ws2['!cols'] = [8, 28, 18, 14, 14, 10, 16].map(w => ({ wch: w }));
-    XLSX.utils.book_append_sheet(wb, ws2, 'Laboratory Attendance');
+    const avgL = labTotal > 0 && students.length > 0
+      ? (students.reduce((a,s) => a + (s.labPresent/labTotal)*100, 0) / students.length).toFixed(1) + '%' : '0.0%';
+    addTotalsRow(ws2, ['', `Total Students: ${students.length}`, '', '', `Total Lab Sessions: ${labTotal}`, '', `Avg: ${avgL}`], 7);
   }
 
-  /* ─ Sheet 3: Summary ─ */
-  const summaryHeaderRows = buildHeader('Summary', exportType === 'Both' ? 'Theory + Lab' : exportType);
-  summaryHeaderRows.push([
+  /* ════════════════════════════════
+     SHEET 3 — Summary
+  ════════════════════════════════ */
+  const ws3 = WB.addWorksheet('Summary');
+  ws3.columns = [
+    { width: 8 }, { width: 26 }, { width: 18 },
+    { width: 16 }, { width: 16 }, { width: 12 },
+    { width: 14 }, { width: 12 }, { width: 12 }, { width: 12 },
+  ];
+  addHeaderBlock(ws3, 'Attendance Summary', exportType === 'Both' ? 'Theory + Lab' : exportType, 10);
+  const hRow3 = addColHeaders(ws3, [
     'Sr.No', 'Student Name', 'Enrollment No',
     'Theory Sessions', 'Theory Present', 'Theory %',
-    'Lab Sessions', 'Lab Present', 'Lab %',
-    'Overall %'
+    'Lab Sessions', 'Lab Present', 'Lab %', 'Overall %'
   ]);
+  ws3.views = [{ state: 'frozen', ySplit: hRow3 }];
 
   const theoryTotal = theorySessions.length;
   const labTotal    = labSessions.length;
 
   students.forEach((st, i) => {
-    const tPct = theoryTotal > 0 ? ((st.theoryPresent / theoryTotal) * 100).toFixed(1) + '%' : '—';
-    const lPct = labTotal    > 0 ? ((st.labPresent    / labTotal)    * 100).toFixed(1) + '%' : '—';
+    const tPct  = theoryTotal > 0 ? ((st.theoryPresent/theoryTotal)*100).toFixed(1)+'%' : '—';
+    const lPct  = labTotal    > 0 ? ((st.labPresent/labTotal)*100).toFixed(1)+'%'       : '—';
     const totalS = theoryTotal + labTotal;
     const totalP = st.theoryPresent + st.labPresent;
-    const oPct   = totalS > 0 ? ((totalP / totalS) * 100).toFixed(1) + '%' : '—';
-    summaryHeaderRows.push([i+1, st.name, st.roll, theoryTotal, st.theoryPresent, tPct, labTotal, st.labPresent, lPct, oPct]);
+    const oPct   = totalS > 0 ? ((totalP/totalS)*100).toFixed(1)+'%' : '—';
+    const oPctNum = totalS > 0 ? (totalP/totalS)*100 : null;
+    const pctColor = oPctNum === null ? C.muted : oPctNum >= 75 ? C.green : oPctNum >= 50 ? C.amber : C.red;
+
+    ws3.addRow([i+1, st.name, st.roll, theoryTotal, st.theoryPresent, tPct, labTotal, st.labPresent, lPct, oPct]);
+    styleDataRow(ws3, ws3.lastRow.number, i, 10, r => {
+      r.getCell(10).font = { bold: true, size: 9, color: { argb: pctColor } };
+      r.getCell(6).font  = { bold: true, size: 9, color: { argb: C.indigo } };
+      r.getCell(9).font  = { bold: true, size: 9, color: { argb: C.cyan } };
+    });
   });
 
-  // Class averages
-  summaryHeaderRows.push([]);
   const avgT = theoryTotal > 0 && students.length > 0
-    ? (students.reduce((a, s) => a + s.theoryPresent, 0) / (students.length * theoryTotal) * 100).toFixed(1) + '%' : '—';
+    ? (students.reduce((a,s) => a+s.theoryPresent, 0)/(students.length*theoryTotal)*100).toFixed(1)+'%' : '—';
   const avgL = labTotal > 0 && students.length > 0
-    ? (students.reduce((a, s) => a + s.labPresent, 0) / (students.length * labTotal) * 100).toFixed(1) + '%' : '—';
-  const avgO = (theoryTotal + labTotal) > 0 && students.length > 0
-    ? (students.reduce((a, s) => a + s.theoryPresent + s.labPresent, 0) / (students.length * (theoryTotal + labTotal)) * 100).toFixed(1) + '%' : '—';
+    ? (students.reduce((a,s) => a+s.labPresent, 0)/(students.length*labTotal)*100).toFixed(1)+'%' : '—';
+  const avgO = (theoryTotal+labTotal) > 0 && students.length > 0
+    ? (students.reduce((a,s) => a+s.theoryPresent+s.labPresent, 0)/(students.length*(theoryTotal+labTotal))*100).toFixed(1)+'%' : '—';
 
-  summaryHeaderRows.push(['', 'Total Students: ' + students.length, '', theoryTotal, '', 'Class Avg Theory: ' + avgT, labTotal, '', 'Class Avg Lab: ' + avgL, 'Class Avg: ' + avgO]);
+  addTotalsRow(ws3, [
+    '', `Total Students: ${students.length}`, '',
+    theoryTotal, '', `Avg Theory: ${avgT}`,
+    labTotal, '', `Avg Lab: ${avgL}`, `Avg: ${avgO}`
+  ], 10);
 
-  const ws3 = XLSX.utils.aoa_to_sheet(summaryHeaderRows);
-  ws3['!cols'] = [8, 28, 18, 16, 16, 12, 14, 14, 12, 12].map(w => ({ wch: w }));
-  XLSX.utils.book_append_sheet(wb, ws3, 'Summary');
+  // ── Download ──
+  const subLabel   = (subjectFilter === 'ALL' ? 'All_Subjects' : subjectFilter.slice(0,20)).replace(/[^a-zA-Z0-9_]/g,'_');
+  const monthLabel = new Date(fromDate).toLocaleDateString('en-IN', { month:'long', year:'numeric' }).replace(' ','');
+  const filename   = `Attendance_${subLabel}_${monthLabel}.xlsx`.replace(/\s/g,'_');
 
-  // Filename
-  const subLabel = (subjectFilter === 'ALL' ? 'All_Subjects' : subjectFilter.slice(0, 20)).replace(/[^a-zA-Z0-9_]/g, '_');
-  const monthLabel = new Date(fromDate).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }).replace(' ', '');
-  const filename = `Attendance_${subLabel}_${monthLabel}.xlsx`.replace(/\s/g, '_');
-
-  XLSX.writeFile(wb, filename);
+  const buffer = await WB.xlsx.writeBuffer();
+  const blob   = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url    = URL.createObjectURL(blob);
+  const a      = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
 }
-
 function fmtDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
