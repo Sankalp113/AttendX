@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -865,17 +865,15 @@
           <thead>
             <tr>
               <th>Subject</th>
-              <th>Theory Sessions</th>
+              <th>Theory Lectures</th>
               <th>Lab Sessions</th>
-              <th>Theory Present</th>
-              <th>Lab Present</th>
               <th>Theory %</th>
               <th>Lab %</th>
               <th>Overall %</th>
             </tr>
           </thead>
           <tbody id="subject-breakdown-tbody">
-            <tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📊</div>No sessions yet.</div></td></tr>
+            <tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📊</div>No sessions yet.</div></td></tr>
           </tbody>
         </table>
       </div>
@@ -917,21 +915,21 @@
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
         <div>
           <div class="card-title">👤 Student-wise Attendance Summary</div>
-          <div class="card-sub" style="margin:0;">Theory &amp; Laboratory attendance tracked separately per student.</div>
+          <div class="card-sub" style="margin:0;">Subject-wise Theory &amp; Lab attendance per student.</div>
         </div>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Name</th><th>Roll / ID</th>
-              <th>Theory Present</th><th>Theory Total</th><th>Theory %</th>
-              <th>Lab Present</th><th>Lab Total</th><th>Lab %</th>
+              <th>Name</th><th>Roll / ID</th><th>Subject</th>
+              <th>Theory Lec.</th><th>Theory %</th>
+              <th>Lab Sessions</th><th>Lab %</th>
               <th>Overall %</th><th>Status</th>
             </tr>
           </thead>
           <tbody id="student-summary-tbody">
-            <tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📊</div>No data yet.</div></td></tr>
+            <tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📊</div>No data yet.</div></td></tr>
           </tbody>
         </table>
       </div>
@@ -1178,7 +1176,6 @@ function pctPill(pct) {
   return `<span class="pct-pill ${cls}">${pct}%</span>`;
 }
 
-/* ─── Subject-wise Theory/Lab Breakdown Table ─── */
 function renderSubjectTable(targetSessions) {
   const tbody = document.getElementById('subject-breakdown-tbody');
   if (!tbody) return;
@@ -1190,39 +1187,30 @@ function renderSubjectTable(targetSessions) {
     if (!subjectMap[key]) subjectMap[key] = { subject: key, theorySessions: 0, labSessions: 0, theoryPresent: 0, labPresent: 0 };
     const isLab = (s.sessionType || '').toLowerCase() === 'laboratory';
     const presentCount = (s.attendance || []).length;
-    if (isLab) {
-      subjectMap[key].labSessions++;
-      subjectMap[key].labPresent += presentCount;
-    } else {
-      subjectMap[key].theorySessions++;
-      subjectMap[key].theoryPresent += presentCount;
-    }
+    if (isLab) { subjectMap[key].labSessions++; subjectMap[key].labPresent += presentCount; }
+    else { subjectMap[key].theorySessions++; subjectMap[key].theoryPresent += presentCount; }
   });
 
   const rows = Object.values(subjectMap);
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📊</div>No sessions yet.</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📊</div>No sessions yet.</div></td></tr>';
     return;
   }
 
   tbody.innerHTML = '';
   rows.forEach(r => {
-    const theoryPct = r.theorySessions > 0 ? Math.round((r.theoryPresent / r.theorySessions) * 100) : null;
-    const labPct    = r.labSessions    > 0 ? Math.round((r.labPresent    / r.labSessions)    * 100) : null;
-    const totalSessions = r.theorySessions + r.labSessions;
-    const totalPresent  = r.theoryPresent  + r.labPresent;
-    const overallPct = totalSessions > 0 ? Math.round((totalPresent / totalSessions) * 100) : null;
+    const theoryPct  = r.theorySessions > 0 ? Math.round((r.theoryPresent / r.theorySessions) * 100) : null;
+    const labPct     = r.labSessions    > 0 ? Math.round((r.labPresent    / r.labSessions)    * 100) : null;
+    const totalS     = r.theorySessions + r.labSessions;
+    const totalP     = r.theoryPresent  + r.labPresent;
+    const overallPct = totalS > 0 ? Math.round((totalP / totalS) * 100) : null;
 
-    const theoryPill  = theoryPct  !== null ? pctPill(theoryPct)  : '<span style="color:var(--text-muted);font-size:0.75rem;">—</span>';
-    const labPill     = labPct     !== null ? pctPill(labPct)     : '<span style="color:var(--text-muted);font-size:0.75rem;">—</span>';
-    const overallPill = overallPct !== null ? pctPill(overallPct) : '<span style="color:var(--text-muted);font-size:0.75rem;">—</span>';
+    const theoryPill  = theoryPct  !== null ? pctPill(theoryPct)  : '<span style="color:var(--text-muted);">—</span>';
+    const labPill     = labPct     !== null ? pctPill(labPct)     : '<span style="color:var(--text-muted);">—</span>';
+    const overallPill = overallPct !== null ? pctPill(overallPct) : '<span style="color:var(--text-muted);">—</span>';
 
-    const theoryBar = theoryPct !== null
-      ? `<div class="mini-bar-row"><span style="color:var(--primary-light);width:26px;">${theoryPct}%</span><div class="mini-bar-track"><div class="mini-bar-fill theory" style="width:${theoryPct}%;"></div></div></div>`
-      : '';
-    const labBar = labPct !== null
-      ? `<div class="mini-bar-row"><span style="color:var(--accent);width:26px;">${labPct}%</span><div class="mini-bar-track"><div class="mini-bar-fill lab" style="width:${labPct}%;"></div></div></div>`
-      : '';
+    const theoryBar = theoryPct !== null ? `<div class="mini-bar-track" style="margin-top:4px;"><div class="mini-bar-fill theory" style="width:${theoryPct}%;"></div></div>` : '';
+    const labBar    = labPct    !== null ? `<div class="mini-bar-track" style="margin-top:4px;"><div class="mini-bar-fill lab" style="width:${labPct}%;"></div></div>` : '';
 
     tbody.innerHTML += `
       <tr>
@@ -1283,51 +1271,68 @@ function updateAnalyticsViews() {
   // ── Subject Breakdown Table ──
   renderSubjectTable(targetSessions);
 
-  // ── Student-wise Summary (Theory + Lab separately) ──
+  // ── Student-wise Summary — Subject-wise, Theory + Lab per subject ──
+  // Build: { studentKey: { name, roll, subjects: { subjectName: { theoryP, labP } } } }
   const studentMap = {};
+  // Also build per-subject session counts
+  const subjectSessionCounts = {}; // { subject: { theory: n, lab: n } }
   targetSessions.forEach(s => {
+    const subj  = s.subject;
     const isLab = (s.sessionType || '').toLowerCase() === 'laboratory';
+    if (!subjectSessionCounts[subj]) subjectSessionCounts[subj] = { theory: 0, lab: 0 };
+    if (isLab) subjectSessionCounts[subj].lab++;
+    else       subjectSessionCounts[subj].theory++;
+
     (s.attendance || []).forEach(a => {
       const k = a.roll.toLowerCase();
-      if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, theoryPresent: 0, labPresent: 0 };
-      if (isLab) studentMap[k].labPresent++;
-      else studentMap[k].theoryPresent++;
+      if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, subjects: {} };
+      if (!studentMap[k].subjects[subj]) studentMap[k].subjects[subj] = { theoryP: 0, labP: 0 };
+      if (isLab) studentMap[k].subjects[subj].labP++;
+      else       studentMap[k].subjects[subj].theoryP++;
     });
   });
 
-  const studentList = Object.values(studentMap);
+  const studentList = Object.values(studentMap).sort((a, b) => a.roll.localeCompare(b.roll));
+  const allSubjects = Object.keys(subjectSessionCounts).sort();
   const tbody = document.getElementById('student-summary-tbody');
+
   if (!studentList.length) {
-    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📊</div>No data yet.</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📊</div>No data yet.</div></td></tr>';
   } else {
     tbody.innerHTML = '';
-    studentList.sort((a, b) => a.roll.localeCompare(b.roll)).forEach(st => {
-      const tPct = theorySessions.length ? Math.round((st.theoryPresent / theorySessions.length) * 100) : null;
-      const lPct = labSessions.length    ? Math.round((st.labPresent    / labSessions.length)    * 100) : null;
-      const totalP = st.theoryPresent + st.labPresent;
-      const totalS = theorySessions.length + labSessions.length;
-      const oPct   = totalS ? Math.round((totalP / totalS) * 100) : null;
+    studentList.forEach((st, stIdx) => {
+      allSubjects.forEach((subj, sIdx) => {
+        const sc   = subjectSessionCounts[subj];
+        const att  = st.subjects[subj] || { theoryP: 0, labP: 0 };
+        const tPct = sc.theory > 0 ? Math.round((att.theoryP / sc.theory) * 100) : null;
+        const lPct = sc.lab    > 0 ? Math.round((att.labP    / sc.lab)    * 100) : null;
+        const totS = sc.theory + sc.lab;
+        const totP = att.theoryP + att.labP;
+        const oPct = totS > 0 ? Math.round((totP / totS) * 100) : null;
 
-      let badge = 'badge-green';
-      if (oPct === null) badge = 'badge-blue';
-      else if (oPct < 50) badge = 'badge-red';
-      else if (oPct < 75) badge = 'badge-yellow';
+        let badge = 'badge-green';
+        if (oPct === null) badge = 'badge-blue';
+        else if (oPct < 50) badge = 'badge-red';
+        else if (oPct < 75) badge = 'badge-yellow';
+        const label = oPct === null ? '—' : oPct >= 75 ? 'Good' : oPct >= 50 ? 'Warn' : 'Low';
 
-      const label = oPct === null ? '—' : oPct >= 75 ? 'Good' : oPct >= 50 ? 'Warning' : 'Low';
+        // Only show Name+Roll on first subject row for this student
+        const isFirstSubj = sIdx === 0;
+        const rowStyle = isFirstSubj && stIdx > 0 ? ' style="border-top:2px solid rgba(99,102,241,0.2);"' : '';
 
-      tbody.innerHTML += `
-        <tr>
-          <td style="font-weight:600;">${esc(st.name)}</td>
-          <td style="font-family:monospace;color:var(--primary-light);">${esc(st.roll)}</td>
-          <td>${st.theoryPresent}</td>
-          <td>${theorySessions.length}</td>
-          <td>${tPct !== null ? pctPill(tPct) : '—'}</td>
-          <td style="color:var(--accent);">${st.labPresent}</td>
-          <td>${labSessions.length}</td>
-          <td>${lPct !== null ? pctPill(lPct) : '—'}</td>
-          <td>${oPct !== null ? pctPill(oPct) : '—'}</td>
-          <td><span class="badge ${badge}">${label}</span></td>
-        </tr>`;
+        tbody.innerHTML += `
+          <tr${rowStyle}>
+            <td style="font-weight:600;">${isFirstSubj ? esc(st.name) : ''}</td>
+            <td style="font-family:monospace;color:var(--primary-light);font-size:0.8rem;">${isFirstSubj ? esc(st.roll) : ''}</td>
+            <td style="color:var(--text-muted);font-size:0.82rem;">${esc(subj)}</td>
+            <td class="num">${sc.theory > 0 ? att.theoryP + '/' + sc.theory : '—'}</td>
+            <td>${tPct !== null ? pctPill(tPct) : '<span style="color:var(--text-muted);">—</span>'}</td>
+            <td class="num" style="color:var(--accent);">${sc.lab > 0 ? att.labP + '/' + sc.lab : '—'}</td>
+            <td>${lPct !== null ? pctPill(lPct) : '<span style="color:var(--text-muted);">—</span>'}</td>
+            <td>${oPct !== null ? pctPill(oPct) : '—'}</td>
+            <td><span class="badge ${badge}">${label}</span></td>
+          </tr>`;
+      });
     });
   }
 
