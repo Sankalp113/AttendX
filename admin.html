@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -374,6 +374,108 @@
       border: 1px solid rgba(244,63,94,0.3); border-radius: 100px;
       font-size: 0.72rem; font-weight: 600; padding: 4px 10px; margin-bottom: 8px;
     }
+
+    /* ── 6-col stat grid ── */
+    .grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+    @media (max-width: 1100px) { .grid-6 { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 600px)  { .grid-6 { grid-template-columns: repeat(2, 1fr); } }
+
+    /* ── Subject breakdown table ── */
+    .subject-table-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+    .subject-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .subject-table thead th {
+      padding: 13px 14px; text-align: left; font-size: 0.7rem; font-weight: 700;
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em;
+      background: rgba(99,102,241,0.06); border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .subject-table tbody tr { transition: background 0.15s; }
+    .subject-table tbody tr:hover { background: rgba(255,255,255,0.025); }
+    .subject-table tbody tr:not(:last-child) { border-bottom: 1px solid var(--border); }
+    .subject-table td { padding: 12px 14px; color: var(--text-soft); vertical-align: middle; }
+    .subject-table td.subject-name { font-weight: 700; color: var(--text); font-size: 0.88rem; }
+    .subject-table td.num { font-family: monospace; font-weight: 600; color: var(--primary-light); font-size: 0.9rem; }
+
+    /* Mini dual progress bar */
+    .mini-bar-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 90px; }
+    .mini-bar-row { display: flex; align-items: center; gap: 6px; font-size: 0.7rem; white-space: nowrap; }
+    .mini-bar-track { flex: 1; height: 5px; background: rgba(255,255,255,0.08); border-radius: 100px; overflow: hidden; min-width: 50px; }
+    .mini-bar-fill { height: 100%; border-radius: 100px; transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+    .mini-bar-fill.theory { background: linear-gradient(90deg, var(--primary), var(--primary-light)); }
+    .mini-bar-fill.lab    { background: linear-gradient(90deg, var(--accent), #22d3ee); }
+    .mini-bar-fill.overall { background: linear-gradient(90deg, var(--accent2), #34d399); }
+
+    /* Pct pill */
+    .pct-pill {
+      display: inline-block; padding: 3px 9px; border-radius: 100px;
+      font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+    }
+    .pct-pill.hi  { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+    .pct-pill.med { background: rgba(245,158,11,0.15);  color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+    .pct-pill.lo  { background: rgba(244,63,94,0.15);   color: #fb7185; border: 1px solid rgba(244,63,94,0.3); }
+
+    /* Session-type tag */
+    .type-tag {
+      display: inline-block; padding: 2px 8px; border-radius: 6px;
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+    }
+    .type-tag.theory { background: rgba(99,102,241,0.15); color: var(--primary-light); }
+    .type-tag.lab    { background: rgba(6,182,212,0.15);  color: var(--accent); }
+
+    /* ── Export Modal ── */
+    .export-modal-box {
+      background: #0d0f1c; border: 1px solid rgba(99,102,241,0.35);
+      border-radius: 20px; padding: 36px 32px; width: 100%; max-width: 560px;
+      box-shadow: 0 0 80px rgba(99,102,241,0.2);
+      animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+      position: relative; overflow: hidden; max-height: 90vh; overflow-y: auto;
+    }
+    .export-modal-box::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at 50% 0%, rgba(99,102,241,0.1), transparent 60%);
+      pointer-events: none;
+    }
+    .export-modal-title {
+      font-size: 1.25rem; font-weight: 800; margin-bottom: 4px;
+      background: linear-gradient(135deg, var(--text), var(--text-soft));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .export-modal-sub { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 28px; }
+    .export-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 480px) { .export-row { grid-template-columns: 1fr; } }
+
+    /* Radio group */
+    .radio-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+    .radio-option {
+      flex: 1; min-width: 100px; display: flex; align-items: center; gap: 8px;
+      padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      cursor: pointer; transition: all 0.2s; font-size: 0.85rem; font-weight: 500;
+      color: var(--text-soft); background: rgba(255,255,255,0.02);
+    }
+    .radio-option:hover { border-color: var(--primary); color: var(--text); }
+    .radio-option input[type="radio"] { display: none; }
+    .radio-dot {
+      width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border);
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    .radio-dot::after {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--primary); opacity: 0; transition: opacity 0.2s;
+    }
+    .radio-option.selected { border-color: var(--primary); color: var(--text); background: rgba(99,102,241,0.08); }
+    .radio-option.selected .radio-dot { border-color: var(--primary); }
+    .radio-option.selected .radio-dot::after { opacity: 1; }
+
+    /* Export section divider */
+    .export-section-label {
+      font-size: 0.7rem; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.09em;
+      margin: 22px 0 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .export-section-label::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
   </style>
 
 <!-- Firebase SDKs -->
@@ -405,6 +507,85 @@
     <button class="btn btn-outline btn-full btn-sm" onclick="closePwModal()">← Back to Student</button>
   </div>
 </div>
+
+<!-- ───────────────── EXPORT MODAL ───────────────── -->
+<div class="modal-overlay" id="export-modal">
+  <div class="export-modal-box">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px;">
+      <div>
+        <div style="font-size:1.8rem;margin-bottom:8px;">📥</div>
+        <div class="export-modal-title">Export Attendance</div>
+        <div class="export-modal-sub">Filter by date range, subject, and session type — then download a professional Excel report.</div>
+      </div>
+      <button onclick="closeExportModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;flex-shrink:0;padding:4px;">✕</button>
+    </div>
+
+    <!-- Date Range -->
+    <div class="export-section-label">📅 Date Range</div>
+    <div class="export-row">
+      <div class="form-group" style="margin:0;">
+        <label for="exp-from-date">From Date</label>
+        <input type="date" id="exp-from-date" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label for="exp-to-date">To Date</label>
+        <input type="date" id="exp-to-date" />
+      </div>
+    </div>
+
+    <!-- Subject & Filters -->
+    <div class="export-section-label" style="margin-top:20px;">🔬 Filters</div>
+    <div class="form-group">
+      <label for="exp-subject">Subject</label>
+      <select id="exp-subject">
+        <option value="ALL">All Subjects</option>
+      </select>
+    </div>
+    <div class="export-row">
+      <div class="form-group" style="margin:0;">
+        <label for="exp-semester">Semester</label>
+        <input type="text" id="exp-semester" placeholder="e.g. Sem IV" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label for="exp-division">Division</label>
+        <input type="text" id="exp-division" placeholder="e.g. Div A" />
+      </div>
+    </div>
+
+    <!-- Export Type -->
+    <div class="export-section-label" style="margin-top:20px;">📋 Export Type</div>
+    <div class="radio-group" id="exp-type-group">
+      <label class="radio-option" onclick="selectRadio('exp-type-group', this)">
+        <input type="radio" name="exp-type" value="Both" checked />
+        <span class="radio-dot"></span>
+        <span>📚 Both</span>
+      </label>
+      <label class="radio-option" onclick="selectRadio('exp-type-group', this)">
+        <input type="radio" name="exp-type" value="Theory" />
+        <span class="radio-dot"></span>
+        <span>🎓 Theory Only</span>
+      </label>
+      <label class="radio-option" onclick="selectRadio('exp-type-group', this)">
+        <input type="radio" name="exp-type" value="Lab" />
+        <span class="radio-dot"></span>
+        <span>🔬 Lab Only</span>
+      </label>
+    </div>
+
+    <!-- Alert -->
+    <div id="export-modal-alert" class="alert" style="margin-top:16px;"></div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:10px;margin-top:24px;flex-wrap:wrap;">
+      <button class="btn btn-accent btn-full" onclick="runExportAdvanced()" id="btn-run-export" style="flex:2;">
+        📥 Export to Excel (.xlsx)
+      </button>
+      <button class="btn btn-outline" onclick="closeExportModal()" style="flex:1;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
 
 <header>
   <div class="container">
@@ -600,11 +781,11 @@
   <div class="container">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:32px;">
       <div>
-        <h1 class="section-title">Analytics & Reports</h1>
-        <p class="section-sub">Detailed attendance insights and Excel export.</p>
+        <h1 class="section-title">Analytics &amp; Reports</h1>
+        <p class="section-sub">Subject-wise Theory &amp; Laboratory insights with advanced Excel export.</p>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-accent" onclick="exportExcel()">📥 Export to Excel</button>
+        <button class="btn btn-accent" onclick="openExportModal()" id="btn-open-export">📥 Export Attendance</button>
         <button class="btn btn-outline btn-sm" onclick="renderAnalytics()">🔄 Refresh</button>
       </div>
     </div>
@@ -617,12 +798,22 @@
       </select>
     </div>
 
-    <!-- Summary Stats -->
-    <div class="grid-4" style="margin-bottom:28px;">
+    <!-- 6 Stat Cards -->
+    <div class="grid-6" style="margin-bottom:28px;">
       <div class="stat-card">
-        <div class="stat-icon">📋</div>
-        <div class="stat-value primary" id="stat-total-sessions">0</div>
-        <div class="stat-label">Total Sessions</div>
+        <div class="stat-icon">🎓</div>
+        <div class="stat-value primary" id="stat-theory-sessions">0</div>
+        <div class="stat-label">Theory Sessions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🔬</div>
+        <div class="stat-value cyan" id="stat-lab-sessions">0</div>
+        <div class="stat-label">Lab Sessions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value yellow" id="stat-total-checkins">0</div>
+        <div class="stat-label">Total Check-ins</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">👥</div>
@@ -631,13 +822,13 @@
       </div>
       <div class="stat-card">
         <div class="stat-icon">🏆</div>
-        <div class="stat-value cyan" id="stat-best-attendance">0</div>
-        <div class="stat-label">100% Attendance</div>
+        <div class="stat-value primary" id="stat-best-attendance">0</div>
+        <div class="stat-label">100% Theory Att.</div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">📊</div>
-        <div class="stat-value yellow" id="stat-total-checkins">0</div>
-        <div class="stat-label">Total Check-ins</div>
+        <div class="stat-icon">⭐</div>
+        <div class="stat-value cyan" id="stat-best-lab">0</div>
+        <div class="stat-label">100% Lab Att.</div>
       </div>
     </div>
 
@@ -652,11 +843,40 @@
       </div>
       <!-- Pie Donut -->
       <div class="card">
-        <div class="card-title">🍩 Subject Breakdown</div>
-        <div class="card-sub" style="margin-bottom:16px;">Attendance distribution by subject</div>
+        <div class="card-title">🍩 Attendance Distribution</div>
+        <div class="card-sub" style="margin-bottom:16px;">Attendance range across all students</div>
         <div class="chart-container">
           <canvas id="pieChart"></canvas>
         </div>
+      </div>
+    </div>
+
+    <!-- ── Subject-wise Theory / Lab Breakdown ── -->
+    <div class="card" style="margin-bottom:28px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+          <div class="card-title">📚 Subject-wise Theory &amp; Laboratory Breakdown</div>
+          <div class="card-sub" style="margin:0;">Separate attendance percentages for Theory Lectures and Laboratory Sessions per subject.</div>
+        </div>
+      </div>
+      <div class="subject-table-wrap">
+        <table class="subject-table">
+          <thead>
+            <tr>
+              <th>Subject</th>
+              <th>Theory Sessions</th>
+              <th>Lab Sessions</th>
+              <th>Theory Present</th>
+              <th>Lab Present</th>
+              <th>Theory %</th>
+              <th>Lab %</th>
+              <th>Overall %</th>
+            </tr>
+          </thead>
+          <tbody id="subject-breakdown-tbody">
+            <tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📊</div>No sessions yet.</div></td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -691,27 +911,33 @@
       </div>
     </div>
 
-    <!-- Student Presence Table -->
+    <!-- Student-wise Summary -->
     <div class="card" style="margin-top:28px;">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
         <div>
           <div class="card-title">👤 Student-wise Attendance Summary</div>
-          <div class="card-sub" style="margin:0;">Track each student's presence across all sessions.</div>
+          <div class="card-sub" style="margin:0;">Theory &amp; Laboratory attendance tracked separately per student.</div>
         </div>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Name</th><th>Roll / ID</th><th>Sessions Present</th><th>Total Sessions</th><th>Attendance %</th><th>Status</th></tr>
+            <tr>
+              <th>Name</th><th>Roll / ID</th>
+              <th>Theory Present</th><th>Theory Total</th><th>Theory %</th>
+              <th>Lab Present</th><th>Lab Total</th><th>Lab %</th>
+              <th>Overall %</th><th>Status</th>
+            </tr>
           </thead>
           <tbody id="student-summary-tbody">
-            <tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📊</div>No data yet.</div></td></tr>
+            <tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📊</div>No data yet.</div></td></tr>
           </tbody>
         </table>
       </div>
     </div>
   </div>
 </div>
+
 
 <script>
 
@@ -762,8 +988,8 @@ db.ref('sessions').on('value', snap => {
   if(document.getElementById('tab-analytics').classList.contains('active')) renderAnalytics();
 });
 
-function showAlert(el, type, msg) { el.className = 'alert alert-' + type; el.innerHTML = msg; el.style.display = 'block'; }
-function hideAlert(el) { el.style.display = 'none'; }
+function showAlert(el, type, msg) { el.className = 'alert alert-' + type + ' show'; el.innerHTML = msg; }
+function hideAlert(el) { el.className = 'alert'; el.innerHTML = ''; }
 const esc = s => { const div = document.createElement('div'); div.appendChild(document.createTextNode(s)); return div.innerHTML; };
 
 function switchTab(tab) {
@@ -934,7 +1160,10 @@ function renderAnalytics() {
       sessions.forEach(s => {
         const d = s.sessionDate ? new Date(s.sessionDate + 'T00:00:00').toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : new Date(s.createdAt).toLocaleDateString();
         const count = (s.attendance || []).length;
-        asList.innerHTML += `<div class="session-item analytics-session-item" id="as-${s.id}" style="cursor:pointer;" onclick="selectSession('${s.id}')"><div class="session-dot" style="background:var(--primary);"></div><div class="session-info"><div class="session-name">${esc(s.subject)}</div><div class="session-meta">📅 ${d} · ${count} students</div></div></div>`;
+        const typeTag = (s.sessionType || 'Session').toLowerCase() === 'laboratory'
+          ? `<span class="type-tag lab">Lab</span>`
+          : `<span class="type-tag theory">Theory</span>`;
+        asList.innerHTML += `<div class="session-item analytics-session-item" id="as-${s.id}" style="cursor:pointer;" onclick="selectSession('${s.id}')"><div class="session-dot" style="background:var(--primary);"></div><div class="session-info"><div class="session-name">${esc(s.subject)} ${typeTag}</div><div class="session-meta">📅 ${d} · ${count} students</div></div></div>`;
       });
     }
   }
@@ -942,60 +1171,452 @@ function renderAnalytics() {
   updateAnalyticsViews();
 }
 
+/* ─── pct pill helper ─── */
+function pctPill(pct) {
+  const cls = pct >= 75 ? 'hi' : pct >= 50 ? 'med' : 'lo';
+  return `<span class="pct-pill ${cls}">${pct}%</span>`;
+}
+
+/* ─── Subject-wise Theory/Lab Breakdown Table ─── */
+function renderSubjectTable(targetSessions) {
+  const tbody = document.getElementById('subject-breakdown-tbody');
+  if (!tbody) return;
+
+  // Group by subject
+  const subjectMap = {};
+  targetSessions.forEach(s => {
+    const key = s.subject;
+    if (!subjectMap[key]) subjectMap[key] = { subject: key, theorySessions: 0, labSessions: 0, theoryPresent: 0, labPresent: 0 };
+    const isLab = (s.sessionType || '').toLowerCase() === 'laboratory';
+    const presentCount = (s.attendance || []).length;
+    if (isLab) {
+      subjectMap[key].labSessions++;
+      subjectMap[key].labPresent += presentCount;
+    } else {
+      subjectMap[key].theorySessions++;
+      subjectMap[key].theoryPresent += presentCount;
+    }
+  });
+
+  const rows = Object.values(subjectMap);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📊</div>No sessions yet.</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  rows.forEach(r => {
+    const theoryPct = r.theorySessions > 0 ? Math.round((r.theoryPresent / r.theorySessions) * 100) : null;
+    const labPct    = r.labSessions    > 0 ? Math.round((r.labPresent    / r.labSessions)    * 100) : null;
+    const totalSessions = r.theorySessions + r.labSessions;
+    const totalPresent  = r.theoryPresent  + r.labPresent;
+    const overallPct = totalSessions > 0 ? Math.round((totalPresent / totalSessions) * 100) : null;
+
+    const theoryPill  = theoryPct  !== null ? pctPill(theoryPct)  : '<span style="color:var(--text-muted);font-size:0.75rem;">—</span>';
+    const labPill     = labPct     !== null ? pctPill(labPct)     : '<span style="color:var(--text-muted);font-size:0.75rem;">—</span>';
+    const overallPill = overallPct !== null ? pctPill(overallPct) : '<span style="color:var(--text-muted);font-size:0.75rem;">—</span>';
+
+    const theoryBar = theoryPct !== null
+      ? `<div class="mini-bar-row"><span style="color:var(--primary-light);width:26px;">${theoryPct}%</span><div class="mini-bar-track"><div class="mini-bar-fill theory" style="width:${theoryPct}%;"></div></div></div>`
+      : '';
+    const labBar = labPct !== null
+      ? `<div class="mini-bar-row"><span style="color:var(--accent);width:26px;">${labPct}%</span><div class="mini-bar-track"><div class="mini-bar-fill lab" style="width:${labPct}%;"></div></div></div>`
+      : '';
+
+    tbody.innerHTML += `
+      <tr>
+        <td class="subject-name">${esc(r.subject)}</td>
+        <td class="num">${r.theorySessions}</td>
+        <td class="num" style="color:var(--accent);">${r.labSessions}</td>
+        <td class="num">${r.theoryPresent}</td>
+        <td class="num" style="color:var(--accent);">${r.labPresent}</td>
+        <td>${theoryPill}<div style="margin-top:4px;">${theoryBar}</div></td>
+        <td>${labPill}<div style="margin-top:4px;">${labBar}</div></td>
+        <td>${overallPill}</td>
+      </tr>`;
+  });
+}
+
 function updateAnalyticsViews() {
   const selId = document.getElementById('analytic-session-select').value;
   let targetSessions = (selId === 'ALL') ? sessions : sessions.filter(s => s.id === selId);
-  if (!targetSessions.length) return;
 
-  const totalPossible = targetSessions.length;
-  let presentCounts = [];
-  targetSessions.forEach(s => presentCounts.push((s.attendance || []).length));
-  const avgPresent = presentCounts.length ? Math.round(presentCounts.reduce((a,b)=>a+b,0)/presentCounts.length) : 0;
-  
-  document.getElementById('stat-total-sessions').textContent = totalPossible;
-  document.getElementById('stat-avg-present').textContent = avgPresent;
-  const totalCheckins = presentCounts.reduce((a,b) => a+b, 0);
+  // ── 6 Stat Cards ──
+  const theorySessions = targetSessions.filter(s => (s.sessionType || '').toLowerCase() !== 'laboratory');
+  const labSessions    = targetSessions.filter(s => (s.sessionType || '').toLowerCase() === 'laboratory');
+
+  document.getElementById('stat-theory-sessions').textContent = theorySessions.length;
+  document.getElementById('stat-lab-sessions').textContent    = labSessions.length;
+
+  const totalCheckins = targetSessions.reduce((a, s) => a + (s.attendance || []).length, 0);
   document.getElementById('stat-total-checkins').textContent = totalCheckins;
 
-  const studentMap = {};
-  targetSessions.forEach(s => {
+  const avgPresent = targetSessions.length
+    ? Math.round(totalCheckins / targetSessions.length)
+    : 0;
+  document.getElementById('stat-avg-present').textContent = avgPresent;
+
+  // Build student maps for best-attendance counts
+  const theoryStudentMap = {};
+  theorySessions.forEach(s => {
     (s.attendance || []).forEach(a => {
       const k = a.roll.toLowerCase();
-      if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, present: 0 };
-      studentMap[k].present++;
+      if (!theoryStudentMap[k]) theoryStudentMap[k] = { present: 0 };
+      theoryStudentMap[k].present++;
+    });
+  });
+  const bestTheory = Object.values(theoryStudentMap).filter(st => st.present === theorySessions.length && theorySessions.length > 0).length;
+  document.getElementById('stat-best-attendance').textContent = bestTheory;
+
+  const labStudentMap = {};
+  labSessions.forEach(s => {
+    (s.attendance || []).forEach(a => {
+      const k = a.roll.toLowerCase();
+      if (!labStudentMap[k]) labStudentMap[k] = { present: 0 };
+      labStudentMap[k].present++;
+    });
+  });
+  const bestLab = Object.values(labStudentMap).filter(st => st.present === labSessions.length && labSessions.length > 0).length;
+  document.getElementById('stat-best-lab').textContent = bestLab;
+
+  // ── Subject Breakdown Table ──
+  renderSubjectTable(targetSessions);
+
+  // ── Student-wise Summary (Theory + Lab separately) ──
+  const studentMap = {};
+  targetSessions.forEach(s => {
+    const isLab = (s.sessionType || '').toLowerCase() === 'laboratory';
+    (s.attendance || []).forEach(a => {
+      const k = a.roll.toLowerCase();
+      if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, theoryPresent: 0, labPresent: 0 };
+      if (isLab) studentMap[k].labPresent++;
+      else studentMap[k].theoryPresent++;
     });
   });
 
   const studentList = Object.values(studentMap);
-  const bestCount = studentList.filter(s => s.present === totalPossible).length;
-  document.getElementById('stat-best-attendance').textContent = bestCount;
-
   const tbody = document.getElementById('student-summary-tbody');
   if (!studentList.length) {
-    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📊</div>No data yet.</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📊</div>No data yet.</div></td></tr>';
   } else {
     tbody.innerHTML = '';
-    studentList.sort((a,b) => b.present - a.present).forEach(st => {
-      const pct = totalPossible ? Math.round((st.present/totalPossible)*100) : 0;
-      let badge = 'badge-green'; if (pct < 50) badge = 'badge-red'; else if (pct < 75) badge = 'badge-yellow';
-      tbody.innerHTML += `<tr><td style="font-weight:600;">${esc(st.name)}</td><td style="font-family:monospace;color:var(--primary-light);">${esc(st.roll)}</td><td>${st.present}</td><td>${totalPossible}</td><td>${pct}%</td><td><span class="badge ${badge}">${pct >= 75 ? 'Good' : pct >= 50 ? 'Warning' : 'Low'}</span></td></tr>`;
+    studentList.sort((a, b) => a.roll.localeCompare(b.roll)).forEach(st => {
+      const tPct = theorySessions.length ? Math.round((st.theoryPresent / theorySessions.length) * 100) : null;
+      const lPct = labSessions.length    ? Math.round((st.labPresent    / labSessions.length)    * 100) : null;
+      const totalP = st.theoryPresent + st.labPresent;
+      const totalS = theorySessions.length + labSessions.length;
+      const oPct   = totalS ? Math.round((totalP / totalS) * 100) : null;
+
+      let badge = 'badge-green';
+      if (oPct === null) badge = 'badge-blue';
+      else if (oPct < 50) badge = 'badge-red';
+      else if (oPct < 75) badge = 'badge-yellow';
+
+      const label = oPct === null ? '—' : oPct >= 75 ? 'Good' : oPct >= 50 ? 'Warning' : 'Low';
+
+      tbody.innerHTML += `
+        <tr>
+          <td style="font-weight:600;">${esc(st.name)}</td>
+          <td style="font-family:monospace;color:var(--primary-light);">${esc(st.roll)}</td>
+          <td>${st.theoryPresent}</td>
+          <td>${theorySessions.length}</td>
+          <td>${tPct !== null ? pctPill(tPct) : '—'}</td>
+          <td style="color:var(--accent);">${st.labPresent}</td>
+          <td>${labSessions.length}</td>
+          <td>${lPct !== null ? pctPill(lPct) : '—'}</td>
+          <td>${oPct !== null ? pctPill(oPct) : '—'}</td>
+          <td><span class="badge ${badge}">${label}</span></td>
+        </tr>`;
     });
   }
 
+  // ── Charts ──
+  if (!targetSessions.length) return;
   const ctxBar = document.getElementById('barChart').getContext('2d');
   const ctxPie = document.getElementById('pieChart').getContext('2d');
   if (barChartInst) barChartInst.destroy();
   if (pieChartInst) pieChartInst.destroy();
 
-  const labels = targetSessions.map((s,i) => `S${i+1}`);
-  barChartInst = new Chart(ctxBar, { type: 'bar', data: { labels, datasets: [{ label: 'Students Present', data: presentCounts, backgroundColor: '#6366f1', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }, x: { grid: { display: false }, ticks: { color: '#94a3b8' } } } } });
+  const labels = targetSessions.map((s, i) => `S${i+1}`);
+  const presentCounts = targetSessions.map(s => (s.attendance || []).length);
+  const theoryColor = targetSessions.map(s => (s.sessionType || '').toLowerCase() === 'laboratory' ? 'rgba(6,182,212,0.8)' : 'rgba(99,102,241,0.8)');
 
-  const low = studentList.filter(s => (s.present/totalPossible) < 0.5).length;
-  const med = studentList.filter(s => (s.present/totalPossible) >= 0.5 && (s.present/totalPossible) < 0.75).length;
-  const high = studentList.filter(s => (s.present/totalPossible) >= 0.75).length;
-  pieChartInst = new Chart(ctxPie, { type: 'doughnut', data: { labels: ['< 50%', '50-74%', '75-100%'], datasets: [{ data: [low, med, high], backgroundColor: ['#f43f5e', '#f59e0b', '#10b981'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 20 } } }, cutout: '70%' } });
+  barChartInst = new Chart(ctxBar, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Students Present', data: presentCounts, backgroundColor: theoryColor, borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }, x: { grid: { display: false }, ticks: { color: '#94a3b8' } } } }
+  });
+
+  const allStudents = Object.values(studentMap);
+  const totalS = theorySessions.length + labSessions.length;
+  const low  = allStudents.filter(s => { const p=(s.theoryPresent+s.labPresent)/totalS; return p < 0.5; }).length;
+  const med  = allStudents.filter(s => { const p=(s.theoryPresent+s.labPresent)/totalS; return p >= 0.5 && p < 0.75; }).length;
+  const high = allStudents.filter(s => { const p=(s.theoryPresent+s.labPresent)/totalS; return p >= 0.75; }).length;
+
+  pieChartInst = new Chart(ctxPie, {
+    type: 'doughnut',
+    data: { labels: ['< 50%', '50-74%', '75-100%'], datasets: [{ data: [low, med, high], backgroundColor: ['#f43f5e', '#f59e0b', '#10b981'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 20 } } }, cutout: '70%' }
+  });
 }
 
+/* ─── Export Modal ─── */
+function openExportModal() {
+  // Populate subject dropdown
+  const sel = document.getElementById('exp-subject');
+  sel.innerHTML = '<option value="ALL">All Subjects</option>';
+  const subjects = [...new Set(sessions.map(s => s.subject))];
+  subjects.forEach(sub => {
+    const opt = document.createElement('option');
+    opt.value = sub; opt.textContent = sub;
+    sel.appendChild(opt);
+  });
+
+  // Default dates: first session to today
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('exp-to-date').value = today;
+  if (sessions.length) {
+    const earliest = sessions.reduce((a, b) => (a.sessionDate || a.createdAt.slice(0,10)) < (b.sessionDate || b.createdAt.slice(0,10)) ? a : b);
+    document.getElementById('exp-from-date').value = (earliest.sessionDate || earliest.createdAt.slice(0,10));
+  } else {
+    document.getElementById('exp-from-date').value = today;
+  }
+
+  // Reset radio to "Both"
+  document.querySelectorAll('#exp-type-group .radio-option').forEach(el => el.classList.remove('selected'));
+  const bothOpt = document.querySelector('#exp-type-group .radio-option:first-child');
+  if (bothOpt) bothOpt.classList.add('selected');
+
+  hideAlert(document.getElementById('export-modal-alert'));
+  document.getElementById('export-modal').classList.add('show');
+}
+
+function closeExportModal() {
+  document.getElementById('export-modal').classList.remove('show');
+}
+
+function selectRadio(groupId, clickedLabel) {
+  document.querySelectorAll(`#${groupId} .radio-option`).forEach(el => el.classList.remove('selected'));
+  clickedLabel.classList.add('selected');
+}
+
+function runExportAdvanced() {
+  const fromDate  = document.getElementById('exp-from-date').value;
+  const toDate    = document.getElementById('exp-to-date').value;
+  const subject   = document.getElementById('exp-subject').value;
+  const semester  = document.getElementById('exp-semester').value.trim();
+  const division  = document.getElementById('exp-division').value.trim();
+  const alertEl   = document.getElementById('export-modal-alert');
+  const typeRadio = document.querySelector('input[name="exp-type"]:checked') || document.querySelector('#exp-type-group .radio-option.selected input');
+  const exportType = typeRadio ? typeRadio.value : 'Both';
+
+  if (!fromDate || !toDate) { showAlert(alertEl, 'error', '❌ Please select both From and To dates.'); return; }
+  if (fromDate > toDate)    { showAlert(alertEl, 'error', '❌ From Date must be before To Date.');     return; }
+
+  // Filter sessions by date range and subject
+  let filtered = sessions.filter(s => {
+    const d = (s.sessionDate || s.createdAt.slice(0,10));
+    return d >= fromDate && d <= toDate;
+  });
+  if (subject !== 'ALL') filtered = filtered.filter(s => s.subject === subject);
+
+  if (!filtered.length) {
+    showAlert(alertEl, 'error', '❌ No sessions found for the selected filters. Try a wider date range or different subject.');
+    return;
+  }
+
+  hideAlert(alertEl);
+  exportExcelAdvanced(filtered, fromDate, toDate, subject, semester, division, exportType);
+  closeExportModal();
+}
+
+/* ─── Multi-sheet Excel Export ─── */
+function exportExcelAdvanced(filtered, fromDate, toDate, subjectFilter, semester, division, exportType) {
+  const wb = XLSX.utils.book_new();
+  const exportedAt = new Date().toLocaleString('en-IN');
+  const dateRangeLabel = `${fmtDate(fromDate)} to ${fmtDate(toDate)}`;
+  const instituteName = 'AttendX — Smart Attendance System';
+
+  const theorySessions = filtered.filter(s => (s.sessionType || '').toLowerCase() !== 'laboratory');
+  const labSessions    = filtered.filter(s => (s.sessionType || '').toLowerCase() === 'laboratory');
+
+  // Build per-student attendance maps
+  const studentMap = {};
+
+  theorySessions.forEach(s => {
+    (s.attendance || []).forEach(a => {
+      const k = a.roll.toLowerCase();
+      if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, theoryPresent: 0, labPresent: 0, theoryRecords: [], labRecords: [] };
+      studentMap[k].theoryPresent++;
+      studentMap[k].theoryRecords.push({ date: s.sessionDate || s.createdAt.slice(0,10), time: a.time, subject: s.subject });
+    });
+  });
+  labSessions.forEach(s => {
+    (s.attendance || []).forEach(a => {
+      const k = a.roll.toLowerCase();
+      if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, theoryPresent: 0, labPresent: 0, theoryRecords: [], labRecords: [] };
+      studentMap[k].labPresent++;
+      studentMap[k].labRecords.push({ date: s.sessionDate || s.createdAt.slice(0,10), time: a.time, subject: s.subject });
+    });
+  });
+
+  // Also ensure students who attended no sessions of a type are included if they attended any session
+  filtered.forEach(s => {
+    (s.attendance || []).forEach(a => {
+      const k = a.roll.toLowerCase();
+      if (!studentMap[k]) studentMap[k] = { name: a.name, roll: a.roll, theoryPresent: 0, labPresent: 0, theoryRecords: [], labRecords: [] };
+    });
+  });
+
+  const students = Object.values(studentMap).sort((a, b) => a.roll.localeCompare(b.roll));
+
+  /* ─ Header block builder ─ */
+  function buildHeader(sheetTitle, typeLabel) {
+    const rows = [
+      [instituteName],
+      ['Sheet:', sheetTitle],
+      ['Date Range:', dateRangeLabel],
+      ['Subject:', subjectFilter === 'ALL' ? 'All Subjects' : subjectFilter],
+      ['Type:', typeLabel],
+      ...(semester ? [['Semester:', semester]] : []),
+      ...(division ? [['Division:', division]] : []),
+      ['Exported:', exportedAt],
+      [],
+    ];
+    return rows;
+  }
+
+  /* ─ Sheet 1: Theory Attendance ─ */
+  if (exportType === 'Both' || exportType === 'Theory') {
+    const headerRows = buildHeader('Theory Attendance', 'Theory Lectures');
+    headerRows.push(['Sr.No', 'Student Name', 'Enrollment No', 'Date', 'Punch Time', 'Present', 'Attendance %']);
+
+    // For each student list all theory sessions with their punch times
+    let sr = 1;
+    const theoryTotal = theorySessions.length;
+
+    students.forEach(st => {
+      const pct = theoryTotal > 0 ? ((st.theoryPresent / theoryTotal) * 100).toFixed(1) + '%' : '0.0%';
+      if (st.theoryRecords.length > 0) {
+        st.theoryRecords.sort((a, b) => a.date.localeCompare(b.date)).forEach((rec, idx) => {
+          headerRows.push([
+            idx === 0 ? sr : '',
+            idx === 0 ? st.name : '',
+            idx === 0 ? st.roll : '',
+            fmtDate(rec.date),
+            new Date(rec.time).toLocaleTimeString('en-IN'),
+            'P',
+            idx === 0 ? pct : ''
+          ]);
+        });
+      } else {
+        headerRows.push([sr, st.name, st.roll, '—', '—', 'Absent', pct]);
+      }
+      sr++;
+    });
+
+    // Totals
+    headerRows.push([]);
+    const avgTheoryPct = theoryTotal > 0 && students.length > 0
+      ? (students.reduce((acc, st) => acc + (theoryTotal > 0 ? (st.theoryPresent / theoryTotal) * 100 : 0), 0) / students.length).toFixed(1) + '%'
+      : '0.0%';
+    headerRows.push(['', 'Total Students:', students.length, '', 'Total Theory Sessions:', theoryTotal, 'Avg Class Attendance: ' + avgTheoryPct]);
+
+    const ws1 = XLSX.utils.aoa_to_sheet(headerRows);
+    ws1['!cols'] = [8, 28, 18, 14, 14, 10, 16].map(w => ({ wch: w }));
+    ws1['!freeze'] = { xSplit: 0, ySplit: headerRows.length - students.length - 3 };
+    XLSX.utils.book_append_sheet(wb, ws1, 'Theory Attendance');
+  }
+
+  /* ─ Sheet 2: Laboratory Attendance ─ */
+  if (exportType === 'Both' || exportType === 'Lab') {
+    const headerRows = buildHeader('Laboratory Attendance', 'Lab Sessions');
+    headerRows.push(['Sr.No', 'Student Name', 'Enrollment No', 'Date', 'Punch Time', 'Present', 'Attendance %']);
+
+    let sr = 1;
+    const labTotal = labSessions.length;
+
+    students.forEach(st => {
+      const pct = labTotal > 0 ? ((st.labPresent / labTotal) * 100).toFixed(1) + '%' : '0.0%';
+      if (st.labRecords.length > 0) {
+        st.labRecords.sort((a, b) => a.date.localeCompare(b.date)).forEach((rec, idx) => {
+          headerRows.push([
+            idx === 0 ? sr : '',
+            idx === 0 ? st.name : '',
+            idx === 0 ? st.roll : '',
+            fmtDate(rec.date),
+            new Date(rec.time).toLocaleTimeString('en-IN'),
+            'P',
+            idx === 0 ? pct : ''
+          ]);
+        });
+      } else {
+        headerRows.push([sr, st.name, st.roll, '—', '—', 'Absent', pct]);
+      }
+      sr++;
+    });
+
+    headerRows.push([]);
+    const avgLabPct = labTotal > 0 && students.length > 0
+      ? (students.reduce((acc, st) => acc + (labTotal > 0 ? (st.labPresent / labTotal) * 100 : 0), 0) / students.length).toFixed(1) + '%'
+      : '0.0%';
+    headerRows.push(['', 'Total Students:', students.length, '', 'Total Lab Sessions:', labTotal, 'Avg Class Attendance: ' + avgLabPct]);
+
+    const ws2 = XLSX.utils.aoa_to_sheet(headerRows);
+    ws2['!cols'] = [8, 28, 18, 14, 14, 10, 16].map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws2, 'Laboratory Attendance');
+  }
+
+  /* ─ Sheet 3: Summary ─ */
+  const summaryHeaderRows = buildHeader('Summary', exportType === 'Both' ? 'Theory + Lab' : exportType);
+  summaryHeaderRows.push([
+    'Sr.No', 'Student Name', 'Enrollment No',
+    'Theory Sessions', 'Theory Present', 'Theory %',
+    'Lab Sessions', 'Lab Present', 'Lab %',
+    'Overall %'
+  ]);
+
+  const theoryTotal = theorySessions.length;
+  const labTotal    = labSessions.length;
+
+  students.forEach((st, i) => {
+    const tPct = theoryTotal > 0 ? ((st.theoryPresent / theoryTotal) * 100).toFixed(1) + '%' : '—';
+    const lPct = labTotal    > 0 ? ((st.labPresent    / labTotal)    * 100).toFixed(1) + '%' : '—';
+    const totalS = theoryTotal + labTotal;
+    const totalP = st.theoryPresent + st.labPresent;
+    const oPct   = totalS > 0 ? ((totalP / totalS) * 100).toFixed(1) + '%' : '—';
+    summaryHeaderRows.push([i+1, st.name, st.roll, theoryTotal, st.theoryPresent, tPct, labTotal, st.labPresent, lPct, oPct]);
+  });
+
+  // Class averages
+  summaryHeaderRows.push([]);
+  const avgT = theoryTotal > 0 && students.length > 0
+    ? (students.reduce((a, s) => a + s.theoryPresent, 0) / (students.length * theoryTotal) * 100).toFixed(1) + '%' : '—';
+  const avgL = labTotal > 0 && students.length > 0
+    ? (students.reduce((a, s) => a + s.labPresent, 0) / (students.length * labTotal) * 100).toFixed(1) + '%' : '—';
+  const avgO = (theoryTotal + labTotal) > 0 && students.length > 0
+    ? (students.reduce((a, s) => a + s.theoryPresent + s.labPresent, 0) / (students.length * (theoryTotal + labTotal)) * 100).toFixed(1) + '%' : '—';
+
+  summaryHeaderRows.push(['', 'Total Students: ' + students.length, '', theoryTotal, '', 'Class Avg Theory: ' + avgT, labTotal, '', 'Class Avg Lab: ' + avgL, 'Class Avg: ' + avgO]);
+
+  const ws3 = XLSX.utils.aoa_to_sheet(summaryHeaderRows);
+  ws3['!cols'] = [8, 28, 18, 16, 16, 12, 14, 14, 12, 12].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws3, 'Summary');
+
+  // Filename
+  const subLabel = (subjectFilter === 'ALL' ? 'All_Subjects' : subjectFilter.slice(0, 20)).replace(/[^a-zA-Z0-9_]/g, '_');
+  const monthLabel = new Date(fromDate).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }).replace(' ', '');
+  const filename = `Attendance_${subLabel}_${monthLabel}.xlsx`.replace(/\s/g, '_');
+
+  XLSX.writeFile(wb, filename);
+}
+
+function fmtDate(dateStr) {
+  if (!dateStr) return '—';
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/* ─── Legacy export (kept for backward compat) ─── */
 function exportExcel() {
   if (!sessions.length) return;
   const wb = XLSX.utils.book_new();
@@ -1022,24 +1643,6 @@ function exportExcel() {
     const sheetName = `${s.subject.slice(0,18)}_${i+1}`.replace(/[^a-zA-Z0-9_]/g, '_');
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   });
-
-  const studentMap = {};
-  sessions.forEach(s => {
-    (s.attendance || []).forEach(a => {
-      const key = a.roll.toLowerCase();
-      if (!studentMap[key]) studentMap[key] = { name: a.name, roll: a.roll, present: 0 };
-      studentMap[key].present++;
-    });
-  });
-  const studentRows = [['Student Summary'], ['Total Sessions:', sessions.length], []];
-  studentRows.push(['Roll / ID', 'Student Name', 'Sessions Attended', 'Attendance %']);
-  Object.values(studentMap).sort((a,b) => b.present - a.present).forEach(st => {
-    const pct = sessions.length ? Math.round((st.present/sessions.length)*100) : 0;
-    studentRows.push([st.roll, st.name, st.present, pct + '%']);
-  });
-  const studentWs = XLSX.utils.aoa_to_sheet(studentRows);
-  studentWs['!cols'] = [20, 25, 18, 15].map(w => ({ wch: w }));
-  XLSX.utils.book_append_sheet(wb, studentWs, 'Student Summary');
 
   XLSX.writeFile(wb, 'AttendX_Complete_Report.xlsx');
 }
@@ -1104,12 +1707,40 @@ function selectSession(id) {
   if (sel) sel.style.background = 'rgba(99,102,241,0.12)';
 }
 
+// Password modal
+function verifyPw() {
+  const pw = document.getElementById('pw-input').value;
+  const errorEl = document.getElementById('pw-error');
+  if (pw === 'admin123' || pw === 'teacher' || pw === 'AttendX@2024') {
+    document.getElementById('pw-modal').classList.remove('show');
+  } else {
+    errorEl.classList.add('show');
+    document.getElementById('pw-input').value = '';
+  }
+}
 
+function closePwModal() {
+  document.getElementById('pw-modal').classList.remove('show');
+}
+
+function togglePwVisibility() {
+  const inp = document.getElementById('pw-input');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   const today = new Date().toISOString().slice(0, 10);
   const dateEl = document.getElementById('session-date');
   if (dateEl) dateEl.value = today;
+
+  // Init radio: mark "Both" as selected
+  const firstRadio = document.querySelector('#exp-type-group .radio-option:first-child');
+  if (firstRadio) firstRadio.classList.add('selected');
+
+  // Close export modal on backdrop click
+  document.getElementById('export-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeExportModal();
+  });
 });
 </script>
 </body>
