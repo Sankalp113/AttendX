@@ -1229,7 +1229,14 @@ function updatePastSessions() {
 
 function deleteSession(id) {
   if(confirm("Are you sure you want to delete this session? This action cannot be undone.")) {
-    db.ref('sessions/' + id).remove();
+    db.ref('sessions/' + id).remove()
+      .then(() => {
+        alert("Session deleted successfully.");
+      })
+      .catch((error) => {
+        alert("Error deleting session: " + error.message);
+        console.error("Delete error:", error);
+      });
   }
 }
 
